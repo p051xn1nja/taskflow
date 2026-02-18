@@ -6,7 +6,8 @@ php -S 0.0.0.0:8000 -t .
 Then open http://localhost:8000/login.php.
 
 Login credentials
-Username: user /n
+Username: user
+
 Password: pass
 
 Features
