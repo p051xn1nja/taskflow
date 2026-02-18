@@ -1,0 +1,311 @@
+<?php
+
+declare(strict_types=1);
+
+const AUTH_USERNAME = 'user';
+const AUTH_PASSWORD_HASH = 'bcrypt_hash';
+const SESSION_LIFETIME = 86400; // 24 hours
+
+configureSession();
+session_start();
+$cspScriptNonce = base64_encode(random_bytes(16));
+applySecurityHeaders($cspScriptNonce);
+
+if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+if (!isset($_SESSION['login_attempts']) || !is_int($_SESSION['login_attempts'])) {
+    $_SESSION['login_attempts'] = 0;
+}
+
+if (!isset($_SESSION['lock_until']) || !is_int($_SESSION['lock_until'])) {
+    $_SESSION['lock_until'] = 0;
+}
+
+function configureSession(): void
+{
+    $basePath = appBasePath();
+
+    ini_set('session.gc_maxlifetime', (string) SESSION_LIFETIME);
+    ini_set('session.use_strict_mode', '1');
+    ini_set('session.use_only_cookies', '1');
+
+    session_set_cookie_params([
+        'lifetime' => SESSION_LIFETIME,
+        'path' => $basePath === '' ? '/' : $basePath . '/',
+        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+}
+
+function appBasePath(): string
+{
+    $scriptName = (string) ($_SERVER['SCRIPT_NAME'] ?? '');
+    $dir = str_replace('\\', '/', dirname($scriptName));
+
+    if ($dir === '/' || $dir === '.') {
+        return '';
+    }
+
+    return rtrim($dir, '/');
+}
+
+function appPath(string $targetFile): string
+{
+    $basePath = appBasePath();
+    return ($basePath === '' ? '' : $basePath) . '/' . ltrim($targetFile, '/');
+}
+
+function applySecurityHeaders(string $scriptNonce): void
+{
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+    header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-" . $scriptNonce . "'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'");
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+}
+
+function verifyCsrfToken(?string $submittedToken): bool
+{
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        return false;
+    }
+
+    if (!is_string($submittedToken)) {
+        return false;
+    }
+
+    return hash_equals($_SESSION['csrf_token'], $submittedToken);
+}
+
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+if (!in_array($method, ['GET', 'POST'], true)) {
+    http_response_code(405);
+    header('Allow: GET, POST');
+    echo 'Method Not Allowed';
+    exit;
+}
+
+if (!empty($_SESSION['authenticated']) && $_SESSION['authenticated'] === true) {
+    header('Location: ' . appPath('index.php'), true, 303);
+    exit;
+}
+
+$error = '';
+$lockRemaining = max(0, $_SESSION['lock_until'] - time());
+
+if ($method === 'POST') {
+    $csrfToken = $_POST['csrf_token'] ?? null;
+    if (!verifyCsrfToken(is_string($csrfToken) ? $csrfToken : null)) {
+        http_response_code(403);
+        echo 'Invalid CSRF token';
+        exit;
+    }
+
+    if ($lockRemaining > 0) {
+        $error = 'Too many failed attempts. Try again in ' . $lockRemaining . ' seconds.';
+    } else {
+        $username = trim((string) ($_POST['username'] ?? ''));
+        $password = (string) ($_POST['password'] ?? '');
+
+        $validUser = hash_equals(AUTH_USERNAME, $username);
+        $validPassword = password_verify($password, AUTH_PASSWORD_HASH);
+
+        if ($validUser && $validPassword) {
+            session_regenerate_id(true);
+            $_SESSION['authenticated'] = true;
+            $_SESSION['login_attempts'] = 0;
+            $_SESSION['lock_until'] = 0;
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            header('Location: ' . appPath('index.php'), true, 303);
+            exit;
+        }
+
+        $_SESSION['login_attempts']++;
+        if ($_SESSION['login_attempts'] >= 5) {
+            $_SESSION['lock_until'] = time() + 120;
+            $_SESSION['login_attempts'] = 0;
+            $error = 'Too many failed attempts. Try again in 120 seconds.';
+        } else {
+            $error = 'Invalid username or password.';
+        }
+    }
+}
+
+$csrfToken = $_SESSION['csrf_token'];
+?>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TaskFlow Login</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --accent: #38bdf8;
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: #0f172a;
+      background-image: radial-gradient(circle at top, #1e293b, #0f172a);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .card {
+      width: min(420px, 100%);
+      background-color: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 18px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, .35);
+      padding: 24px;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+      font-size: 1.8rem;
+    }
+
+    p {
+      margin-top: 0;
+      color: var(--muted);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: .95rem;
+    }
+
+    input {
+      width: 100%;
+      margin-bottom: 14px;
+      background: #0b1220;
+      color: var(--text);
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 1rem;
+    }
+
+    .password-field {
+      position: relative;
+      margin-bottom: 14px;
+    }
+
+    .password-field input {
+      margin-bottom: 0;
+      padding-right: 44px;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 32px;
+      height: 32px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 1rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .password-toggle:hover,
+    .password-toggle:focus-visible {
+      background: #1e293b;
+      color: var(--text);
+      outline: none;
+    }
+
+    .login-submit {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 11px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #082f49;
+    }
+
+    .error {
+      border: 1px solid #7f1d1d;
+      background: #450a0a;
+      color: #fecaca;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>TaskFlow Login</h1>
+    <p>Please sign in to access your tasks.</p>
+
+    <?php if ($error !== ''): ?>
+      <div class="error" role="alert"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+    <?php endif; ?>
+
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
+
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" maxlength="64" required>
+
+      <label for="password">Password</label>
+      <div class="password-field">
+        <input id="password" name="password" type="password" maxlength="128" required>
+        <button class="password-toggle" id="passwordToggle" type="button" aria-label="Show password" aria-pressed="false" aria-controls="password">👁</button>
+      </div>
+
+      <button class="login-submit" type="submit">Sign in</button>
+    </form>
+  </main>
+	<br /><div align="center">TaskFlow App v 1.0.9 - by VibeKode 2026</div>
+  <script nonce="<?= htmlspecialchars($cspScriptNonce, ENT_QUOTES, 'UTF-8'); ?>">
+    (function () {
+      var passwordInput = document.getElementById('password');
+      var toggleButton = document.getElementById('passwordToggle');
+      if (!passwordInput || !toggleButton) {
+        return;
+      }
+
+      toggleButton.addEventListener('click', function () {
+        var revealing = passwordInput.type === 'password';
+        passwordInput.type = revealing ? 'text' : 'password';
+        toggleButton.textContent = revealing ? '🙈' : '👁';
+        toggleButton.setAttribute('aria-pressed', revealing ? 'true' : 'false');
+        toggleButton.setAttribute('aria-label', revealing ? 'Hide password' : 'Show password');
+      });
+    }());
+  </script>
+</body>
+</html>
