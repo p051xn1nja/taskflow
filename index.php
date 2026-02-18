@@ -7,6 +7,8 @@ const DATA_FILE = DATA_DIR . '/tasks.json';
 const CATEGORY_FILE = DATA_DIR . '/categories.json';
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 1000;
+const MAX_TAG_LENGTH = 30;
+const MAX_TAGS_PER_TASK = 10;
 const DEFAULT_PER_PAGE = 50;
 const MAX_PER_PAGE = 1000;
 const UPLOAD_DIR = DATA_DIR . '/uploads';
@@ -143,6 +145,13 @@ function loadTasks(): array
         }
         $attachments = array_slice($attachments, 0, MAX_TASK_FILES);
 
+        $tags = [];
+        if (isset($task['tags']) && is_array($task['tags'])) {
+            $tags = sanitizeTaskTagsInput(implode(',', array_map('strval', $task['tags'])));
+        } elseif (isset($task['tags']) && is_string($task['tags'])) {
+            $tags = sanitizeTaskTagsInput((string) $task['tags']);
+        }
+
         if (!preg_match('/^[a-f0-9]{24}$/', $id) || $title === '') {
             continue;
         }
@@ -162,6 +171,7 @@ function loadTasks(): array
             'category_id' => $categoryId,
             'category_name' => $categoryName,
             'category_color' => $categoryColor,
+            'tags' => $tags,
             'attachments' => $attachments,
         ];
     }
@@ -291,6 +301,39 @@ function sanitizeTaskDescription(string $description): string
     $description = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $description) ?? '';
 
     return function_exists('mb_substr') ? mb_substr($description, 0, MAX_DESCRIPTION_LENGTH) : substr($description, 0, MAX_DESCRIPTION_LENGTH);
+}
+
+function sanitizeTaskTagsInput(string $rawTags): array
+{
+    $rawTags = trim($rawTags);
+    if ($rawTags === '') {
+        return [];
+    }
+
+    $parts = preg_split('/[,\n]+/', $rawTags) ?: [];
+    $normalized = [];
+
+    foreach ($parts as $part) {
+        $tag = trim((string) $part);
+        $tag = preg_replace('/[\x00-\x1F\x7F]/u', '', $tag) ?? '';
+
+        if ($tag === '') {
+            continue;
+        }
+
+        $tag = function_exists('mb_substr') ? mb_substr($tag, 0, MAX_TAG_LENGTH) : substr($tag, 0, MAX_TAG_LENGTH);
+        $key = lowerSafe($tag);
+
+        if (!isset($normalized[$key])) {
+            $normalized[$key] = $tag;
+        }
+
+        if (count($normalized) >= MAX_TAGS_PER_TASK) {
+            break;
+        }
+    }
+
+    return array_values($normalized);
 }
 
 function verifyCsrfToken(?string $submittedToken): bool
@@ -808,6 +851,7 @@ if ($method === 'POST') {
         if ($action === 'add') {
             $title = sanitizeTaskTitle((string) ($_POST['title'] ?? ''));
             $description = sanitizeTaskDescription((string) ($_POST['description'] ?? ''));
+            $tags = sanitizeTaskTagsInput((string) ($_POST['tags'] ?? ''));
             $categoryId = (string) ($_POST['category_id'] ?? '');
             $selectedCategory = preg_match('/^[a-f0-9]{24}$/', $categoryId) === 1 ? findCategoryById($categories, $categoryId) : null;
 
@@ -828,6 +872,7 @@ if ($method === 'POST') {
                     'category_id' => $selectedCategory['id'] ?? '',
                     'category_name' => $selectedCategory['name'] ?? '',
                     'category_color' => $selectedCategory['color'] ?? DEFAULT_CATEGORY_COLOR,
+                    'tags' => $tags,
                     'attachments' => $attachments,
                 ];
                 saveTasks($tasks);
@@ -947,6 +992,7 @@ if ($method === 'POST') {
             $id = (string) ($_POST['id'] ?? '');
             $title = sanitizeTaskTitle((string) ($_POST['title'] ?? ''));
             $description = sanitizeTaskDescription((string) ($_POST['description'] ?? ''));
+            $tags = sanitizeTaskTagsInput((string) ($_POST['tags'] ?? ''));
             $categoryId = (string) ($_POST['category_id'] ?? '');
             $selectedCategory = preg_match('/^[a-f0-9]{24}$/', $categoryId) === 1 ? findCategoryById($categories, $categoryId) : null;
             $deleteAttachments = isset($_POST['delete_attachments']) && is_array($_POST['delete_attachments']) ? array_map('strval', $_POST['delete_attachments']) : [];
@@ -966,6 +1012,7 @@ if ($method === 'POST') {
                     $task['category_id'] = $selectedCategory['id'] ?? '';
                     $task['category_name'] = $selectedCategory['name'] ?? '';
                     $task['category_color'] = $selectedCategory['color'] ?? DEFAULT_CATEGORY_COLOR;
+                    $task['tags'] = $tags;
 
                     if ($progress !== null) {
                         $task['progress'] = $progress;
@@ -1074,7 +1121,7 @@ $filteredTasks = array_values(array_filter($tasks, static function (array $task)
         return true;
     }
 
-    $haystack = lowerSafe((string) (($task['title'] ?? '') . ' ' . ($task['description'] ?? '')));
+    $haystack = lowerSafe((string) (($task['title'] ?? '') . ' ' . ($task['description'] ?? '') . ' ' . implode(' ', array_map('strval', (array) ($task['tags'] ?? [])))));
     return containsSafe($haystack, lowerSafe($searchQuery));
 }));
 
@@ -1248,6 +1295,8 @@ $csrfToken = $_SESSION['csrf_token'];
     .title-group { display:flex; align-items:center; gap:8px; margin-right:auto; min-width:0; }
     .task-percent { color:#cbd5e1; font-size:.9rem; min-width:48px; text-align:right; }
     .category-badge { display:inline-flex; align-items:center; gap:6px; font-size:.78rem; padding:4px 8px; border-radius:999px; color:#e2e8f0; border:1px solid #334155; }
+    .tags-row { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+    .tag-badge { display:inline-flex; align-items:center; font-size:.76rem; padding:3px 8px; border-radius:999px; border:1px solid #334155; color:#cbd5e1; background:#0f172a; }
     .desc { color:#cbd5e1; margin:8px 0; white-space:pre-wrap; }
     .done { text-decoration:line-through; color:var(--muted); }
     .progress-wrap { display:flex; align-items:center; gap:10px; margin:8px 0; }
@@ -1407,6 +1456,7 @@ $csrfToken = $_SESSION['csrf_token'];
             <option value="<?= htmlspecialchars((string) $category['id'], ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars((string) $category['name'], ENT_QUOTES, 'UTF-8'); ?></option>
           <?php endforeach; ?>
         </select>
+        <input name="tags" type="text" maxlength="350" placeholder="Tags (comma separated)">
       </div>
       <div class="task-form-row" style="gap:8px; align-items:center;">
         <button class="ghost-btn js-new-task-add-files" type="button">+ Add files</button>
@@ -1561,6 +1611,7 @@ $csrfToken = $_SESSION['csrf_token'];
                           <option value="<?= htmlspecialchars((string) $category['id'], ENT_QUOTES, 'UTF-8'); ?>" <?= ((string) ($task['category_id'] ?? '') === (string) $category['id']) ? 'selected' : ''; ?>><?= htmlspecialchars((string) $category['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                         <?php endforeach; ?>
                       </select>
+                      <input name="tags" type="text" maxlength="350" placeholder="Tags (comma separated)" value="<?= htmlspecialchars(implode(', ', array_map('strval', (array) ($task['tags'] ?? []))), ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
 
                     <div class="task-details js-task-details is-open">
@@ -1595,6 +1646,14 @@ $csrfToken = $_SESSION['csrf_token'];
                   </form>
                 <?php else: ?>
                   <div class="task-details js-task-details">
+                    <?php $taskTags = array_map('strval', (array) ($task['tags'] ?? [])); ?>
+                    <?php if (count($taskTags) > 0): ?>
+                      <div class="tags-row">
+                        <?php foreach ($taskTags as $tag): ?>
+                          <span class="tag-badge">#<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endforeach; ?>
+                      </div>
+                    <?php endif; ?>
                     <?php if (($task['description'] ?? '') !== ''): ?>
                       <p class="desc"><?= renderDescriptionHtml((string) $task['description']); ?></p>
                     <?php endif; ?>
