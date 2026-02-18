@@ -6,8 +6,9 @@ php -S 0.0.0.0:8000 -t .
 Then open http://localhost:8000/login.php.
 
 Login credentials
-Username: p051xn1nja
-Password: Pir231411@19781009
+Username: user
+Password: pass
+
 Features
 Login-gated access to the task app
 Add tasks with title + description and selectable category
@@ -23,6 +24,8 @@ Edit individual tasks (title + description)
 Mark tasks done / undone
 Delete tasks
 Data persisted in data/tasks.json
+
+
 Security hardening
 CSRF protection on login and all mutating form actions
 Strict input validation and sanitization
