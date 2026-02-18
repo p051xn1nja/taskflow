@@ -11,6 +11,7 @@ Username: user
 
 Password: pass
 
+
 Features
 
 Login-gated access to the task app
@@ -40,6 +41,7 @@ Mark tasks done / undone
 Delete tasks
 
 Data persisted in data/tasks.json
+
 
 
 Security hardening
