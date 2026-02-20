@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-const AUTH_USERNAME = 'p051xn1nja';
-const AUTH_PASSWORD_HASH = '$2y$12$8pZ3iPVlh2hHSYbeFy0vlOZ2DSWkwEnVB2kV020.pZOUziB8ynBgK';
+const AUTH_USERNAME = 'user';
+const AUTH_PASSWORD_HASH = 'hashed_string';
 const SESSION_LIFETIME = 86400; // 24 hours
 const AUTH_COOKIE_NAME = 'taskflow_auth';
-const AUTH_COOKIE_SECRET_FALLBACK = 'card-olive-endless-taste';
+const AUTH_COOKIE_SECRET_FALLBACK = 'secret';
 
 configureSession();
 session_start();
