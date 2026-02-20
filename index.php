@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-const DATA_DIR = __DIR__ . '/path/to/folder';
+const DATA_DIR = __DIR__ . '/../../bucket_misc';
 const DATA_FILE = DATA_DIR . '/tasks.json';
 const CATEGORY_FILE = DATA_DIR . '/categories.json';
 const MAX_TITLE_LENGTH = 120;
 const MAX_DESCRIPTION_LENGTH = 1000;
+const MAX_TAG_LENGTH = 30;
+const MAX_TAGS_PER_TASK = 10;
 const DEFAULT_PER_PAGE = 50;
 const MAX_PER_PAGE = 1000;
 const UPLOAD_DIR = DATA_DIR . '/uploads';
@@ -14,6 +16,8 @@ const DEFAULT_CATEGORY_COLOR = '#64748b';
 const MAX_TASK_FILES = 10;
 const MAX_UPLOAD_FILE_SIZE_BYTES = 26214400; // 25 MB per file
 const SESSION_LIFETIME = 86400; // 24 hours
+const AUTH_COOKIE_NAME = 'taskflow_auth';
+const AUTH_COOKIE_SECRET_FALLBACK = 'card-olive-endless-taste';
 
 configureSession();
 session_start();
@@ -21,6 +25,14 @@ applySecurityHeaders();
 
 if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+if (!isAuthenticated() && restoreAuthFromCookie()) {
+    session_regenerate_id(true);
+    $_SESSION['authenticated'] = true;
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
 }
 
 if (!isAuthenticated()) {
@@ -39,7 +51,7 @@ function configureSession(): void
     session_set_cookie_params([
         'lifetime' => SESSION_LIFETIME,
         'path' => $basePath === '' ? '/' : $basePath . '/',
-        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure' => isHttpsRequest(),
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
@@ -63,6 +75,82 @@ function appPath(string $targetFile): string
     return ($basePath === '' ? '' : $basePath) . '/' . ltrim($targetFile, '/');
 }
 
+function isHttpsRequest(): bool
+{
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+
+    $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+    return is_string($forwardedProto) && strtolower($forwardedProto) === 'https';
+}
+
+function authCookieSecret(): string
+{
+    $secret = getenv('TASKFLOW_AUTH_COOKIE_SECRET');
+    if (is_string($secret) && trim($secret) !== '') {
+        return $secret;
+    }
+
+    return AUTH_COOKIE_SECRET_FALLBACK;
+}
+
+function parseAuthCookie(): ?array
+{
+    $rawCookie = $_COOKIE[AUTH_COOKIE_NAME] ?? null;
+    if (!is_string($rawCookie) || $rawCookie === '') {
+        return null;
+    }
+
+    $decoded = base64_decode($rawCookie, true);
+    if (!is_string($decoded) || $decoded === '') {
+        return null;
+    }
+
+    $parts = explode('|', $decoded);
+    if (count($parts) !== 3) {
+        return null;
+    }
+
+    [$username, $expiresAtRaw, $signature] = $parts;
+    if (!ctype_digit($expiresAtRaw)) {
+        return null;
+    }
+
+    $expiresAt = (int) $expiresAtRaw;
+    if ($expiresAt <= time()) {
+        return null;
+    }
+
+    $payload = $username . '|' . $expiresAt;
+    $expected = hash_hmac('sha256', $payload, authCookieSecret());
+    if (!hash_equals($expected, $signature)) {
+        return null;
+    }
+
+    if (!hash_equals('user', $username)) {
+        return null;
+    }
+
+    return ['expires_at' => $expiresAt];
+}
+
+function restoreAuthFromCookie(): bool
+{
+    return parseAuthCookie() !== null;
+}
+
+function clearAuthCookie(): void
+{
+    setcookie(AUTH_COOKIE_NAME, '', [
+        'expires' => time() - 3600,
+        'path' => appBasePath() === '' ? '/' : appBasePath() . '/',
+        'secure' => isHttpsRequest(),
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+}
+
 function applySecurityHeaders(): void
 {
     header('X-Content-Type-Options: nosniff');
@@ -73,7 +161,7 @@ function applySecurityHeaders(): void
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
 
-    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+    if (isHttpsRequest()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
 }
@@ -143,6 +231,13 @@ function loadTasks(): array
         }
         $attachments = array_slice($attachments, 0, MAX_TASK_FILES);
 
+        $tags = [];
+        if (isset($task['tags']) && is_array($task['tags'])) {
+            $tags = sanitizeTaskTagsInput(implode(',', array_map('strval', $task['tags'])));
+        } elseif (isset($task['tags']) && is_string($task['tags'])) {
+            $tags = sanitizeTaskTagsInput((string) $task['tags']);
+        }
+
         if (!preg_match('/^[a-f0-9]{24}$/', $id) || $title === '') {
             continue;
         }
@@ -162,6 +257,7 @@ function loadTasks(): array
             'category_id' => $categoryId,
             'category_name' => $categoryName,
             'category_color' => $categoryColor,
+            'tags' => $tags,
             'attachments' => $attachments,
         ];
     }
@@ -267,9 +363,9 @@ function findCategoryById(array $categories, string $categoryId): ?array
     return null;
 }
 
-function redirectToIndex(string $search = '', int $page = 1, int $perPage = DEFAULT_PER_PAGE, string $editId = '', string $categoryFilter = '', string $fromDate = '', string $toDate = '', string $statusFilter = '', string $anchor = ''): void
+function redirectToIndex(string $search = '', int $page = 1, int $perPage = DEFAULT_PER_PAGE, string $editId = '', string $categoryFilter = '', string $fromDate = '', string $toDate = '', string $statusFilter = '', string $tagFilter = '', string $tagSearchQuery = '', string $anchor = ''): void
 {
-    header('Location: ' . buildIndexUrl($search, $page, $perPage, $editId, $categoryFilter, $fromDate, $toDate, $statusFilter, $anchor), true, 303);
+    header('Location: ' . buildIndexUrl($search, $page, $perPage, $editId, $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery, $anchor), true, 303);
     exit;
 }
 
@@ -291,6 +387,39 @@ function sanitizeTaskDescription(string $description): string
     $description = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $description) ?? '';
 
     return function_exists('mb_substr') ? mb_substr($description, 0, MAX_DESCRIPTION_LENGTH) : substr($description, 0, MAX_DESCRIPTION_LENGTH);
+}
+
+function sanitizeTaskTagsInput(string $rawTags): array
+{
+    $rawTags = trim($rawTags);
+    if ($rawTags === '') {
+        return [];
+    }
+
+    $parts = preg_split('/[,\n]+/', $rawTags) ?: [];
+    $normalized = [];
+
+    foreach ($parts as $part) {
+        $tag = trim((string) $part);
+        $tag = preg_replace('/[\x00-\x1F\x7F]/u', '', $tag) ?? '';
+
+        if ($tag === '') {
+            continue;
+        }
+
+        $tag = function_exists('mb_substr') ? mb_substr($tag, 0, MAX_TAG_LENGTH) : substr($tag, 0, MAX_TAG_LENGTH);
+        $key = lowerSafe($tag);
+
+        if (!isset($normalized[$key])) {
+            $normalized[$key] = $tag;
+        }
+
+        if (count($normalized) >= MAX_TAGS_PER_TASK) {
+            break;
+        }
+    }
+
+    return array_values($normalized);
 }
 
 function verifyCsrfToken(?string $submittedToken): bool
@@ -498,14 +627,14 @@ function parsePerPage(array $source): int
     return DEFAULT_PER_PAGE;
 }
 
-function buildDownloadUrl(string $searchQuery, int $page, int $perPage, string $storedName, string $categoryFilter = '', string $fromDate = '', string $toDate = '', string $statusFilter = ''): string
+function buildDownloadUrl(string $searchQuery, int $page, int $perPage, string $storedName, string $categoryFilter = '', string $fromDate = '', string $toDate = '', string $statusFilter = '', string $tagFilter = '', string $tagSearchQuery = ''): string
 {
-    $base = buildIndexUrl($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+    $base = buildIndexUrl($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
     $joiner = strpos($base, '?') === false ? '?' : '&';
     return $base . $joiner . 'download=' . rawurlencode($storedName);
 }
 
-function buildIndexUrl(string $searchQuery, int $page, int $perPage, string $editId = '', string $categoryFilter = '', string $fromDate = '', string $toDate = '', string $statusFilter = '', string $anchor = ''): string
+function buildIndexUrl(string $searchQuery, int $page, int $perPage, string $editId = '', string $categoryFilter = '', string $fromDate = '', string $toDate = '', string $statusFilter = '', string $tagFilter = '', string $tagSearchQuery = '', string $anchor = ''): string
 {
     $params = [];
     if ($searchQuery !== '') {
@@ -531,6 +660,12 @@ function buildIndexUrl(string $searchQuery, int $page, int $perPage, string $edi
     }
     if ($statusFilter !== '') {
         $params['status'] = $statusFilter;
+    }
+    if ($tagFilter !== '') {
+        $params['tag'] = $tagFilter;
+    }
+    if ($tagSearchQuery !== '') {
+        $params['tag_q'] = $tagSearchQuery;
     }
 
     $url = appPath('index.php');
@@ -683,6 +818,11 @@ $statusFilter = (string) ($_GET['status'] ?? $_POST['status'] ?? '');
 if (!in_array($statusFilter, ['', 'in_progress', 'completed'], true)) {
     $statusFilter = '';
 }
+$tagSearchQuery = trim((string) ($_GET['tag_q'] ?? $_POST['tag_q'] ?? ''));
+$tagSearchQuery = function_exists('mb_substr') ? mb_substr($tagSearchQuery, 0, MAX_TAG_LENGTH) : substr($tagSearchQuery, 0, MAX_TAG_LENGTH);
+$tagFilter = trim((string) ($_GET['tag'] ?? $_POST['tag'] ?? ''));
+$normalizedTagFilter = sanitizeTaskTagsInput($tagFilter);
+$tagFilter = $normalizedTagFilter !== [] ? (string) $normalizedTagFilter[0] : '';
 $perPage = parsePerPage($_GET + $_POST);
 $page = isset($_GET['page']) ? max(1, (int) $_GET['page']) : (isset($_POST['page']) ? max(1, (int) $_POST['page']) : 1);
 $editId = (string) ($_GET['edit'] ?? $_POST['edit'] ?? '');
@@ -800,6 +940,7 @@ if ($method === 'POST') {
     if ($action === 'logout') {
         session_unset();
         session_destroy();
+        clearAuthCookie();
         header('Location: ' . appPath('login.php'), true, 303);
         exit;
     }
@@ -808,6 +949,7 @@ if ($method === 'POST') {
         if ($action === 'add') {
             $title = sanitizeTaskTitle((string) ($_POST['title'] ?? ''));
             $description = sanitizeTaskDescription((string) ($_POST['description'] ?? ''));
+            $tags = sanitizeTaskTagsInput((string) ($_POST['tags'] ?? ''));
             $categoryId = (string) ($_POST['category_id'] ?? '');
             $selectedCategory = preg_match('/^[a-f0-9]{24}$/', $categoryId) === 1 ? findCategoryById($categories, $categoryId) : null;
 
@@ -828,12 +970,13 @@ if ($method === 'POST') {
                     'category_id' => $selectedCategory['id'] ?? '',
                     'category_name' => $selectedCategory['name'] ?? '',
                     'category_color' => $selectedCategory['color'] ?? DEFAULT_CATEGORY_COLOR,
+                    'tags' => $tags,
                     'attachments' => $attachments,
                 ];
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, 1, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+            redirectToIndex($searchQuery, 1, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
         }
 
         if ($action === 'toggle') {
@@ -849,7 +992,7 @@ if ($method === 'POST') {
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
         }
 
         if ($action === 'updateProgress') {
@@ -869,7 +1012,7 @@ if ($method === 'POST') {
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $taskAnchor);
+            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery, $taskAnchor);
         }
 
         if ($action === 'deleteAttachment') {
@@ -909,7 +1052,7 @@ if ($method === 'POST') {
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
         }
 
         if ($action === 'addAttachment') {
@@ -940,13 +1083,14 @@ if ($method === 'POST') {
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
         }
 
         if ($action === 'editTask') {
             $id = (string) ($_POST['id'] ?? '');
             $title = sanitizeTaskTitle((string) ($_POST['title'] ?? ''));
             $description = sanitizeTaskDescription((string) ($_POST['description'] ?? ''));
+            $tags = sanitizeTaskTagsInput((string) ($_POST['tags'] ?? ''));
             $categoryId = (string) ($_POST['category_id'] ?? '');
             $selectedCategory = preg_match('/^[a-f0-9]{24}$/', $categoryId) === 1 ? findCategoryById($categories, $categoryId) : null;
             $deleteAttachments = isset($_POST['delete_attachments']) && is_array($_POST['delete_attachments']) ? array_map('strval', $_POST['delete_attachments']) : [];
@@ -966,6 +1110,7 @@ if ($method === 'POST') {
                     $task['category_id'] = $selectedCategory['id'] ?? '';
                     $task['category_name'] = $selectedCategory['name'] ?? '';
                     $task['category_color'] = $selectedCategory['color'] ?? DEFAULT_CATEGORY_COLOR;
+                    $task['tags'] = $tags;
 
                     if ($progress !== null) {
                         $task['progress'] = $progress;
@@ -1005,7 +1150,7 @@ if ($method === 'POST') {
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
         }
 
 
@@ -1032,7 +1177,7 @@ if ($method === 'POST') {
                 saveTasks($tasks);
             }
 
-            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter);
+            redirectToIndex($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery);
         }
 
         http_response_code(400);
@@ -1043,7 +1188,7 @@ if ($method === 'POST') {
     }
 }
 
-$filteredTasks = array_values(array_filter($tasks, static function (array $task) use ($searchQuery, $categoryFilter, $fromDate, $toDate, $statusFilter): bool {
+$filteredTasks = array_values(array_filter($tasks, static function (array $task) use ($searchQuery, $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery): bool {
     if ($categoryFilter !== '' && (string) ($task['category_id'] ?? '') !== $categoryFilter) {
         return false;
     }
@@ -1070,11 +1215,19 @@ $filteredTasks = array_values(array_filter($tasks, static function (array $task)
         return false;
     }
 
+    $taskTags = array_map('strval', (array) ($task['tags'] ?? []));
+    if ($tagFilter !== '' && !in_array($tagFilter, $taskTags, true)) {
+        return false;
+    }
+    if ($tagSearchQuery !== '' && !containsSafe(lowerSafe(implode(' ', $taskTags)), lowerSafe($tagSearchQuery))) {
+        return false;
+    }
+
     if ($searchQuery === '') {
         return true;
     }
 
-    $haystack = lowerSafe((string) (($task['title'] ?? '') . ' ' . ($task['description'] ?? '')));
+    $haystack = lowerSafe((string) (($task['title'] ?? '') . ' ' . ($task['description'] ?? '') . ' ' . implode(' ', $taskTags)));
     return containsSafe($haystack, lowerSafe($searchQuery));
 }));
 
@@ -1096,6 +1249,20 @@ foreach ($categories as $category) {
     ];
 }
 usort($categoryOptions, static fn(array $a, array $b): int => strcmp(lowerSafe((string) ($a['name'] ?? '')), lowerSafe((string) ($b['name'] ?? ''))));
+$tagOptions = [];
+foreach ($tasks as $task) {
+    foreach ((array) ($task['tags'] ?? []) as $tag) {
+        $tagValue = (string) $tag;
+        if ($tagValue === '') {
+            continue;
+        }
+        $tagOptions[lowerSafe($tagValue)] = $tagValue;
+    }
+}
+if ($tagFilter !== '') {
+    $tagOptions[lowerSafe($tagFilter)] = $tagFilter;
+}
+asort($tagOptions, SORT_NATURAL | SORT_FLAG_CASE);
 $csrfToken = $_SESSION['csrf_token'];
 ?>
 <!doctype html>
@@ -1170,9 +1337,9 @@ $csrfToken = $_SESSION['csrf_token'];
     .search-row { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
     .search-row input, .search-row button, .search-row select, .task-form input, .task-form select, .task-form textarea, .task-form button { font: inherit; }
     .search-row input { flex:1; min-width:220px; }
-    .search-filter-pair { display:flex; gap:10px; align-items:center; flex:0 0 auto; min-width:360px; }
+    .search-filter-pair { display:flex; gap:10px; align-items:center; flex:1 1 auto; min-width:0; flex-wrap:wrap; }
     .search-actions { display:flex; gap:10px; }
-    .search-filter-pair select { flex:1; min-width:0; }
+    .search-filter-pair select, .search-filter-pair input { flex:1; min-width:160px; }
     .search-row-break { flex-basis:100%; height:0; }
     .date-field { position:relative; min-width:170px; flex:1; }
     .date-field input[type="date"] { padding-right:42px; }
@@ -1248,6 +1415,8 @@ $csrfToken = $_SESSION['csrf_token'];
     .title-group { display:flex; align-items:center; gap:8px; margin-right:auto; min-width:0; }
     .task-percent { color:#cbd5e1; font-size:.9rem; min-width:48px; text-align:right; }
     .category-badge { display:inline-flex; align-items:center; gap:6px; font-size:.78rem; padding:4px 8px; border-radius:999px; color:#e2e8f0; border:1px solid #334155; }
+    .tags-row { display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+    .tag-badge { display:inline-flex; align-items:center; font-size:.76rem; padding:3px 8px; border-radius:999px; border:1px solid #334155; color:#cbd5e1; background:#0f172a; }
     .desc { color:#cbd5e1; margin:8px 0; white-space:pre-wrap; }
     .done { text-decoration:line-through; color:var(--muted); }
     .progress-wrap { display:flex; align-items:center; gap:10px; margin:8px 0; }
@@ -1287,6 +1456,7 @@ $csrfToken = $_SESSION['csrf_token'];
       }
       .search-row input { min-width:0; }
       .search-filter-pair { min-width:0; display:grid; grid-template-columns:1fr 1fr; }
+      .search-filter-pair input[name="tag_q"], .search-filter-pair select[name="tag"] { grid-column:span 2; }
       .date-field { min-width:0; }
       .search-row-break { display:none; }
 
@@ -1331,6 +1501,13 @@ $csrfToken = $_SESSION['csrf_token'];
           <option value="in_progress" <?= $statusFilter === 'in_progress' ? 'selected' : ''; ?>>In progress</option>
           <option value="completed" <?= $statusFilter === 'completed' ? 'selected' : ''; ?>>Completed</option>
         </select>
+        <input name="tag_q" type="text" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>" placeholder="Search tags">
+        <select name="tag">
+          <option value="">All tags</option>
+          <?php foreach ($tagOptions as $tagOption): ?>
+            <option value="<?= htmlspecialchars((string) $tagOption, ENT_QUOTES, 'UTF-8'); ?>" <?= $tagFilter === (string) $tagOption ? 'selected' : ''; ?>><?= htmlspecialchars((string) $tagOption, ENT_QUOTES, 'UTF-8'); ?></option>
+          <?php endforeach; ?>
+        </select>
       </div>
       <span class="search-row-break" aria-hidden="true"></span>
       <label class="date-field">
@@ -1344,7 +1521,7 @@ $csrfToken = $_SESSION['csrf_token'];
       <input type="hidden" name="per_page" value="<?= (int) $perPage; ?>">
       <div class="search-actions">
         <button class="ghost-btn search-submit-btn" type="submit">Search</button>
-        <?php if ($searchQuery !== '' || $categoryFilter !== '' || $statusFilter !== '' || $fromDate !== '' || $toDate !== ''): ?>
+        <?php if ($searchQuery !== '' || $categoryFilter !== '' || $statusFilter !== '' || $tagFilter !== '' || $tagSearchQuery !== '' || $fromDate !== '' || $toDate !== ''): ?>
           <a class="ghost-btn search-clear-btn" style="text-decoration:none;display:inline-flex;align-items:center;" href="<?= htmlspecialchars(buildIndexUrl('', 1, $perPage), ENT_QUOTES, 'UTF-8'); ?>">Clear</a>
         <?php endif; ?>
       </div>
@@ -1356,6 +1533,8 @@ $csrfToken = $_SESSION['csrf_token'];
         <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
         <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
         <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
         <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
         <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
         <label for="per_page">Per page</label>
@@ -1368,10 +1547,10 @@ $csrfToken = $_SESSION['csrf_token'];
         <input type="number" name="per_page_custom" min="1" max="<?= MAX_PER_PAGE; ?>" placeholder="Custom" value="<?= $isCustomPerPage ? (int) $perPage : 50; ?>">
         <button class="ghost-btn" type="submit">Apply</button>
         <?php if ($page > 1): ?>
-          <a class="ghost-btn" style="text-decoration:none;" href="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page - 1, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter), ENT_QUOTES, 'UTF-8'); ?>">Prev</a>
+          <a class="ghost-btn" style="text-decoration:none;" href="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page - 1, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery), ENT_QUOTES, 'UTF-8'); ?>">Prev</a>
         <?php endif; ?>
         <?php if ($page < $totalPages): ?>
-          <a class="ghost-btn" style="text-decoration:none;" href="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page + 1, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter), ENT_QUOTES, 'UTF-8'); ?>">Next</a>
+          <a class="ghost-btn" style="text-decoration:none;" href="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page + 1, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery), ENT_QUOTES, 'UTF-8'); ?>">Next</a>
         <?php endif; ?>
       </form>
     </div>
@@ -1384,6 +1563,8 @@ $csrfToken = $_SESSION['csrf_token'];
       <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+      <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+      <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
       <input name="title" type="text" maxlength="120" placeholder="Task title" required>
@@ -1407,6 +1588,7 @@ $csrfToken = $_SESSION['csrf_token'];
             <option value="<?= htmlspecialchars((string) $category['id'], ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars((string) $category['name'], ENT_QUOTES, 'UTF-8'); ?></option>
           <?php endforeach; ?>
         </select>
+        <input name="tags" type="text" maxlength="350" placeholder="Tags (comma separated)">
       </div>
       <div class="task-form-row" style="gap:8px; align-items:center;">
         <button class="ghost-btn js-new-task-add-files" type="button">+ Add files</button>
@@ -1476,6 +1658,8 @@ $csrfToken = $_SESSION['csrf_token'];
                     <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <input type="hidden" name="page" value="<?= (int) $page; ?>">
@@ -1493,6 +1677,8 @@ $csrfToken = $_SESSION['csrf_token'];
                     <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <input type="hidden" name="page" value="<?= (int) $page; ?>">
@@ -1500,10 +1686,12 @@ $csrfToken = $_SESSION['csrf_token'];
                     <input type="hidden" name="progress" value="<?= !empty($task['done']) ? 0 : 100; ?>">
                     <button class="add-btn task-row-action-btn" type="submit"><?= !empty($task['done']) ? 'Undo' : 'Done'; ?></button>
                   </form>
-                  <form method="get" action="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page, $perPage, "", $categoryFilter, $fromDate, $toDate, $statusFilter, $taskAnchor), ENT_QUOTES, 'UTF-8'); ?>">
+                  <form method="get" action="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page, $perPage, "", $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery, $taskAnchor), ENT_QUOTES, 'UTF-8'); ?>">
                     <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <input type="hidden" name="page" value="<?= (int) $page; ?>">
@@ -1518,6 +1706,8 @@ $csrfToken = $_SESSION['csrf_token'];
                     <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <input type="hidden" name="page" value="<?= (int) $page; ?>">
@@ -1529,13 +1719,15 @@ $csrfToken = $_SESSION['csrf_token'];
 
 
                 <?php if ($isEditing): ?>
-                  <form class="task-form js-edit-form" method="post" autocomplete="off" enctype="multipart/form-data" data-cancel-url="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter), ENT_QUOTES, 'UTF-8'); ?>" data-focus-edit-description="true">
+                  <form class="task-form js-edit-form" method="post" autocomplete="off" enctype="multipart/form-data" data-cancel-url="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery), ENT_QUOTES, 'UTF-8'); ?>" data-focus-edit-description="true">
                     <input type="hidden" name="action" value="editTask">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8'); ?>">
                     <input type="hidden" name="id" value="<?= htmlspecialchars((string) ($task['id'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>">
                     <?php if ($searchQuery !== ''): ?><input type="hidden" name="q" value="<?= htmlspecialchars($searchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($categoryFilter !== ''): ?><input type="hidden" name="category" value="<?= htmlspecialchars($categoryFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($statusFilter !== ''): ?><input type="hidden" name="status" value="<?= htmlspecialchars($statusFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagSearchQuery !== ''): ?><input type="hidden" name="tag_q" value="<?= htmlspecialchars($tagSearchQuery, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
+        <?php if ($tagFilter !== ''): ?><input type="hidden" name="tag" value="<?= htmlspecialchars($tagFilter, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($fromDate !== ''): ?><input type="hidden" name="from" value="<?= htmlspecialchars($fromDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                     <input type="hidden" name="page" value="<?= (int) $page; ?>">
@@ -1561,6 +1753,7 @@ $csrfToken = $_SESSION['csrf_token'];
                           <option value="<?= htmlspecialchars((string) $category['id'], ENT_QUOTES, 'UTF-8'); ?>" <?= ((string) ($task['category_id'] ?? '') === (string) $category['id']) ? 'selected' : ''; ?>><?= htmlspecialchars((string) $category['name'], ENT_QUOTES, 'UTF-8'); ?></option>
                         <?php endforeach; ?>
                       </select>
+                      <input name="tags" type="text" maxlength="350" placeholder="Tags (comma separated)" value="<?= htmlspecialchars(implode(', ', array_map('strval', (array) ($task['tags'] ?? []))), ENT_QUOTES, 'UTF-8'); ?>">
                     </div>
 
                     <div class="task-details js-task-details is-open">
@@ -1573,7 +1766,7 @@ $csrfToken = $_SESSION['csrf_token'];
                           <?php if (!is_array($attachmentItem)) { continue; } ?>
                           <label style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <input type="checkbox" name="delete_attachments[]" value="<?= htmlspecialchars((string) ($attachmentItem['stored'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>"> Delete
-                            <a class="task-attachment" href="<?= htmlspecialchars(buildDownloadUrl($searchQuery, $page, $perPage, (string) ($attachmentItem['stored'] ?? ''), $categoryFilter, $fromDate, $toDate, $statusFilter), ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars((string) ($attachmentItem['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></a>
+                            <a class="task-attachment" href="<?= htmlspecialchars(buildDownloadUrl($searchQuery, $page, $perPage, (string) ($attachmentItem['stored'] ?? ''), $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery), ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars((string) ($attachmentItem['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></a>
                           </label>
                         <?php endforeach; ?>
                       <?php endif; ?>
@@ -1590,11 +1783,19 @@ $csrfToken = $_SESSION['csrf_token'];
 
                     <div class="task-form-row">
                       <button class="add-btn" type="submit">Save changes</button>
-                      <a class="danger-btn js-cancel-edit" href="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter), ENT_QUOTES, 'UTF-8'); ?>">Cancel</a>
+                      <a class="danger-btn js-cancel-edit" href="<?= htmlspecialchars(buildIndexUrl($searchQuery, $page, $perPage, '', $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery), ENT_QUOTES, 'UTF-8'); ?>">Cancel</a>
                     </div>
                   </form>
                 <?php else: ?>
                   <div class="task-details js-task-details">
+                    <?php $taskTags = array_map('strval', (array) ($task['tags'] ?? [])); ?>
+                    <?php if (count($taskTags) > 0): ?>
+                      <div class="tags-row">
+                        <?php foreach ($taskTags as $tag): ?>
+                          <span class="tag-badge">#<?= htmlspecialchars($tag, ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endforeach; ?>
+                      </div>
+                    <?php endif; ?>
                     <?php if (($task['description'] ?? '') !== ''): ?>
                       <p class="desc"><?= renderDescriptionHtml((string) $task['description']); ?></p>
                     <?php endif; ?>
@@ -1614,7 +1815,7 @@ $csrfToken = $_SESSION['csrf_token'];
                           <?php if ($toDate !== ''): ?><input type="hidden" name="to" value="<?= htmlspecialchars($toDate, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                           <input type="hidden" name="page" value="<?= (int) $page; ?>">
                           <input type="hidden" name="per_page" value="<?= (int) $perPage; ?>">
-                          <a href="<?= htmlspecialchars(buildDownloadUrl($searchQuery, $page, $perPage, (string) ($attachmentItem['stored'] ?? ''), $categoryFilter, $fromDate, $toDate, $statusFilter), ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars((string) ($attachmentItem['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></a>
+                          <a href="<?= htmlspecialchars(buildDownloadUrl($searchQuery, $page, $perPage, (string) ($attachmentItem['stored'] ?? ''), $categoryFilter, $fromDate, $toDate, $statusFilter, $tagFilter, $tagSearchQuery), ENT_QUOTES, 'UTF-8'); ?>"><?= htmlspecialchars((string) ($attachmentItem['name'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></a>
                           <button class="danger-btn" type="submit" style="padding:6px 10px;">Delete</button>
                         </form>
                       <?php endforeach; ?>
