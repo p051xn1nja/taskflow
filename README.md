@@ -57,3 +57,12 @@ Session cookie hardening (HttpOnly, SameSite=Strict, subfolder-aware path)
 Atomic file writes with file locking and restrictive file permissions
 
 Session ID regeneration on successful login and basic login throttling
+
+
+Session behavior
+
+Session cookies are configured for 24 hours.
+
+For reverse-proxy deployments, TaskFlow also honors `X-Forwarded-Proto` when setting secure cookies.
+
+Set `TASKFLOW_AUTH_COOKIE_SECRET` in your environment to a strong random value so the long-lived auth cookie signature is unique per deployment.

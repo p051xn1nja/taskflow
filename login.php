@@ -5,6 +5,8 @@ declare(strict_types=1);
 const AUTH_USERNAME = 'user';
 const AUTH_PASSWORD_HASH = 'bcrypt_hash';
 const SESSION_LIFETIME = 86400; // 24 hours
+const AUTH_COOKIE_NAME = 'taskflow_auth';
+const AUTH_COOKIE_SECRET_FALLBACK = 'change-this-cookie-secret';
 
 configureSession();
 session_start();
@@ -34,10 +36,20 @@ function configureSession(): void
     session_set_cookie_params([
         'lifetime' => SESSION_LIFETIME,
         'path' => $basePath === '' ? '/' : $basePath . '/',
-        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure' => isHttpsRequest(),
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
+}
+
+function isHttpsRequest(): bool
+{
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+
+    $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+    return is_string($forwardedProto) && strtolower($forwardedProto) === 'https';
 }
 
 function appBasePath(): string
@@ -68,9 +80,38 @@ function applySecurityHeaders(string $scriptNonce): void
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
 
-    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+    if (isHttpsRequest()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
+}
+
+function authCookieSecret(): string
+{
+    $secret = getenv('TASKFLOW_AUTH_COOKIE_SECRET');
+    if (is_string($secret) && trim($secret) !== '') {
+        return $secret;
+    }
+
+    return AUTH_COOKIE_SECRET_FALLBACK;
+}
+
+function buildAuthCookieValue(int $expiresAt): string
+{
+    $payload = AUTH_USERNAME . '|' . $expiresAt;
+    $signature = hash_hmac('sha256', $payload, authCookieSecret());
+    return base64_encode($payload . '|' . $signature);
+}
+
+function issueAuthCookie(): void
+{
+    $expiresAt = time() + SESSION_LIFETIME;
+    setcookie(AUTH_COOKIE_NAME, buildAuthCookieValue($expiresAt), [
+        'expires' => $expiresAt,
+        'path' => appBasePath() === '' ? '/' : appBasePath() . '/',
+        'secure' => isHttpsRequest(),
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
 }
 
 function verifyCsrfToken(?string $submittedToken): bool
@@ -125,6 +166,7 @@ if ($method === 'POST') {
             $_SESSION['login_attempts'] = 0;
             $_SESSION['lock_until'] = 0;
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            issueAuthCookie();
             header('Location: ' . appPath('index.php'), true, 303);
             exit;
         }

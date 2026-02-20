@@ -16,6 +16,8 @@ const DEFAULT_CATEGORY_COLOR = '#64748b';
 const MAX_TASK_FILES = 10;
 const MAX_UPLOAD_FILE_SIZE_BYTES = 26214400; // 25 MB per file
 const SESSION_LIFETIME = 86400; // 24 hours
+const AUTH_COOKIE_NAME = 'taskflow_auth';
+const AUTH_COOKIE_SECRET_FALLBACK = 'change-this-cookie-secret';
 
 configureSession();
 session_start();
@@ -23,6 +25,14 @@ applySecurityHeaders();
 
 if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+if (!isAuthenticated() && restoreAuthFromCookie()) {
+    session_regenerate_id(true);
+    $_SESSION['authenticated'] = true;
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
 }
 
 if (!isAuthenticated()) {
@@ -41,7 +51,7 @@ function configureSession(): void
     session_set_cookie_params([
         'lifetime' => SESSION_LIFETIME,
         'path' => $basePath === '' ? '/' : $basePath . '/',
-        'secure' => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'secure' => isHttpsRequest(),
         'httponly' => true,
         'samesite' => 'Strict',
     ]);
@@ -65,6 +75,82 @@ function appPath(string $targetFile): string
     return ($basePath === '' ? '' : $basePath) . '/' . ltrim($targetFile, '/');
 }
 
+function isHttpsRequest(): bool
+{
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+
+    $forwardedProto = $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '';
+    return is_string($forwardedProto) && strtolower($forwardedProto) === 'https';
+}
+
+function authCookieSecret(): string
+{
+    $secret = getenv('TASKFLOW_AUTH_COOKIE_SECRET');
+    if (is_string($secret) && trim($secret) !== '') {
+        return $secret;
+    }
+
+    return AUTH_COOKIE_SECRET_FALLBACK;
+}
+
+function parseAuthCookie(): ?array
+{
+    $rawCookie = $_COOKIE[AUTH_COOKIE_NAME] ?? null;
+    if (!is_string($rawCookie) || $rawCookie === '') {
+        return null;
+    }
+
+    $decoded = base64_decode($rawCookie, true);
+    if (!is_string($decoded) || $decoded === '') {
+        return null;
+    }
+
+    $parts = explode('|', $decoded);
+    if (count($parts) !== 3) {
+        return null;
+    }
+
+    [$username, $expiresAtRaw, $signature] = $parts;
+    if (!ctype_digit($expiresAtRaw)) {
+        return null;
+    }
+
+    $expiresAt = (int) $expiresAtRaw;
+    if ($expiresAt <= time()) {
+        return null;
+    }
+
+    $payload = $username . '|' . $expiresAt;
+    $expected = hash_hmac('sha256', $payload, authCookieSecret());
+    if (!hash_equals($expected, $signature)) {
+        return null;
+    }
+
+    if (!hash_equals('user', $username)) {
+        return null;
+    }
+
+    return ['expires_at' => $expiresAt];
+}
+
+function restoreAuthFromCookie(): bool
+{
+    return parseAuthCookie() !== null;
+}
+
+function clearAuthCookie(): void
+{
+    setcookie(AUTH_COOKIE_NAME, '', [
+        'expires' => time() - 3600,
+        'path' => appBasePath() === '' ? '/' : appBasePath() . '/',
+        'secure' => isHttpsRequest(),
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
+}
+
 function applySecurityHeaders(): void
 {
     header('X-Content-Type-Options: nosniff');
@@ -75,7 +161,7 @@ function applySecurityHeaders(): void
     header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
     header('Pragma: no-cache');
 
-    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+    if (isHttpsRequest()) {
         header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
     }
 }
@@ -854,6 +940,7 @@ if ($method === 'POST') {
     if ($action === 'logout') {
         session_unset();
         session_destroy();
+        clearAuthCookie();
         header('Location: ' . appPath('login.php'), true, 303);
         exit;
     }
