@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-const DATA_DIR = __DIR__ . '/../../bucket_misc';
+const DATA_DIR = __DIR__ . '/path/to/folder';
 const DATA_FILE = DATA_DIR . '/tasks.json';
 const CATEGORY_FILE = DATA_DIR . '/categories.json';
 const DEFAULT_CATEGORY_COLOR = '#64748b';
 const SESSION_LIFETIME = 86400; // 24 hours
 const AUTH_COOKIE_NAME = 'taskflow_auth';
-const AUTH_COOKIE_SECRET_FALLBACK = 'card-olive-endless-taste';
+const AUTH_COOKIE_SECRET_FALLBACK = 'secret';
 
 configureSession();
 session_start();
