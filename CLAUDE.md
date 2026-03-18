@@ -25,9 +25,25 @@ Modern task management platform built with Next.js 14, SQLite, and NextAuth.
 src/
 ├── app/              # Next.js App Router
 │   ├── (app)/        # Protected routes (tasks, board, categories, admin)
+│   │   ├── page.tsx          # Task list view
+│   │   ├── board/page.tsx    # Kanban board view
+│   │   ├── categories/       # Category management
+│   │   └── admin/            # Admin panel (users, settings)
 │   ├── login/        # Auth pages
-│   └── api/          # REST API endpoints
+│   ├── api/          # REST API endpoints
+│   │   ├── tasks/            # Task CRUD + per-task endpoints
+│   │   ├── categories/       # Category CRUD
+│   │   ├── uploads/          # File upload, download, delete
+│   │   ├── admin/            # Admin: users CRUD, platform settings
+│   │   └── auth/             # NextAuth + initial setup
+│   ├── icon.tsx      # 32x32 PNG favicon (generated at build time)
+│   └── apple-icon.tsx # 180x180 Apple Touch icon (generated at build time)
 ├── components/       # React components + UI library
+│   ├── TaskCard.tsx          # List view task card (read-only expanded view)
+│   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags)
+│   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
+│   ├── Sidebar.tsx           # Navigation sidebar
+│   └── Providers.tsx         # NextAuth session provider
 ├── lib/              # Core: db.ts (schema), auth.ts, helpers
 └── types/            # TypeScript type definitions
 data/                 # SQLite DB + uploads (gitignored, mounted volume)
@@ -74,6 +90,9 @@ SQLite runs in WAL mode with foreign keys enabled.
   - File attachments: upload (drag-and-drop or browse), download, and delete
   - Tags, category, due date, title, description editing
   - New files are staged and uploaded on save; attachment deletes are immediate
+- **Admin Panel** (`/admin`): Admin-only dashboard
+  - **Users** (`/admin/users`): Manage users — activate/deactivate, approve pending registrations, delete
+  - **Settings** (`/admin/settings`): Platform-wide settings (registration, approval, limits)
 
 ## File Uploads
 
@@ -102,9 +121,21 @@ SQLite runs in WAL mode with foreign keys enabled.
 - `src/app/apple-icon.tsx` — 180x180 Apple Touch icon (mobile bookmarks)
 - Design: white checkmark on brand-blue gradient (`#1a75f5` → `#2a91ff`), rounded corners
 
+## Platform Settings
+
+Managed via Admin → Settings (`platform_settings` table):
+
+- `app_name` — Display name for the app
+- `max_tasks_per_user` — Max tasks per user (default: 1000)
+- `max_file_size_mb` — Legacy per-file limit; total enforcement is 50 MB per task
+- `max_categories_per_user` — Max categories per user (default: 50)
+- `allow_registration` — Whether new users can self-register (default: false)
+- `require_admin_approval` — New registrations require admin approval before activation (default: false)
+
 ## Key Conventions
 
 - First registered user becomes admin
 - API routes under `src/app/api/`
 - Protected pages use the `(app)` route group
 - Default limits: 1000 tasks, 50MB total uploads per task (10 files max), 50 categories per user
+- Admin approval workflow: when enabled, new users get `pending_approval=true` until an admin activates them
