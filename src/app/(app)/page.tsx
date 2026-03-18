@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
-import { FileUpload } from '@/components/FileUpload'
 import { cn, groupBy } from '@/lib/utils'
 import type { Task, Category } from '@/types'
 
@@ -31,7 +30,6 @@ export default function TasksPage() {
   // Form state
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
-  const [uploadTaskId, setUploadTaskId] = useState<string | null>(null)
 
   // Collapsed groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -88,7 +86,7 @@ export default function TasksPage() {
     fetchTasks(pagination.page)
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -107,7 +105,6 @@ export default function TasksPage() {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
-    fetchTasks(pagination.page)
   }
 
   const toggleGroup = (key: string) => {
@@ -305,7 +302,6 @@ export default function TasksPage() {
                       task={task}
                       onUpdate={handleUpdateTask}
                       onDelete={handleDeleteTask}
-                      onDeleteAttachment={handleDeleteAttachment}
                       onEdit={t => setEditingTask(t)}
                     />
                   ))}
@@ -353,25 +349,9 @@ export default function TasksPage() {
           categories={categories}
           onSubmit={handleEditSubmit}
           onCancel={() => setEditingTask(null)}
+          onDeleteAttachment={handleDeleteAttachment}
+          onFilesUploaded={() => fetchTasks(pagination.page)}
         />
-      )}
-
-      {/* File upload modal */}
-      {uploadTaskId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md p-6 animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Upload Files</h2>
-              <button onClick={() => setUploadTaskId(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <FileUpload
-              taskId={uploadTaskId}
-              onUploaded={() => { setUploadTaskId(null); fetchTasks(pagination.page) }}
-            />
-          </div>
-        </div>
       )}
     </div>
   )

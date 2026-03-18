@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import {
-  ChevronDown, ChevronRight, Pencil, Trash2, Check, RotateCcw,
-  Paperclip, Tag, Calendar, Download, X, FileText,
+  ChevronDown, ChevronRight, Pencil, Trash2, Check,
+  Paperclip, Tag, Calendar, Download, FileText,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import type { Task } from '@/types'
@@ -12,11 +12,10 @@ interface TaskCardProps {
   task: Task
   onUpdate: (id: string, data: Partial<Task>) => void
   onDelete: (id: string) => void
-  onDeleteAttachment: (attachmentId: string) => void
   onEdit: (task: Task) => void
 }
 
-export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit }: TaskCardProps) {
+export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false)
 
   const isCompleted = task.status === 'completed'
@@ -131,29 +130,9 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
           </div>
         </div>
 
-        {/* Expanded content */}
+        {/* Expanded content (read-only) */}
         {expanded && (
           <div className="mt-4 ml-14 space-y-4 animate-slide-down">
-            {/* Progress slider */}
-            <div>
-              <label className="text-xs font-medium text-surface-800 mb-1 block">Progress</label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={task.progress}
-                onChange={e => {
-                  e.stopPropagation()
-                  onUpdate(task.id, { progress: parseInt(e.target.value) })
-                }}
-                onMouseDown={e => e.stopPropagation()}
-                onClick={e => e.stopPropagation()}
-                onPointerDown={e => e.stopPropagation()}
-                onTouchStart={e => e.stopPropagation()}
-                className="w-full accent-brand-500"
-              />
-            </div>
-
             {/* Description */}
             {task.description && (
               <div>
@@ -178,7 +157,7 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
               </div>
             )}
 
-            {/* Attachments */}
+            {/* Attachments (download only) */}
             {task.attachments.length > 0 && (
               <div>
                 <label className="text-xs font-medium text-surface-800 mb-1.5 block">Attachments</label>
@@ -198,13 +177,6 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
                       >
                         <Download className="w-3.5 h-3.5" />
                       </a>
-                      <button
-                        onClick={() => onDeleteAttachment(att.id)}
-                        className="p-1 rounded hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
-                        title="Delete"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
                     </div>
                   ))}
                 </div>

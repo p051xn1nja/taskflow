@@ -62,11 +62,30 @@ SQLite runs in WAL mode with foreign keys enabled.
 ## Views
 
 - **Tasks** (`/`): List view with filters, search, pagination
+  - Expanded card view is read-only (description, tags, attachments with download)
+  - Progress bar displayed on each card; editing progress is done via the edit modal
 - **Board** (`/board`): Kanban board with three columns (To Do, In Progress, Done)
   - Columns derived from task `status` and `progress` fields — no extra schema
   - To Do: `status='in_progress'` + `progress=0`; In Progress: `progress 1-99%`; Done: `status='completed'`
   - HTML5 native drag-and-drop (zero dependencies) with optimistic UI updates
   - Moving cards updates `status` and `progress` via `PATCH /api/tasks/:id`
+- **Edit Modal** (`TaskForm`): Unified edit experience for both list and board views
+  - Progress slider (edit mode only) — updates task progress directly
+  - File attachments: upload (drag-and-drop or browse), download, and delete
+  - Tags, category, due date, title, description editing
+  - New files are staged and uploaded on save; attachment deletes are immediate
+
+## File Uploads
+
+- **Limits**: Max 10 files per task, 50 MB total per task
+- **Allowed extensions**:
+  - Documents: pdf, txt, md, docx, doc, xlsx, xls, pptx, ppt, csv, json, rtf, odt
+  - Archives: zip, rar, 7z, tar, gz
+  - Images: png, jpg, jpeg, gif, webp, svg, bmp
+- **Storage**: `/data/uploads/{id}.{ext}` with metadata in `attachments` table
+- **Upload**: Inline in edit modal with drag-and-drop zone; files staged before save
+- **Management**: Download and delete individual attachments in edit mode
+- **API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
 
 ## Testing
 
@@ -81,4 +100,4 @@ SQLite runs in WAL mode with foreign keys enabled.
 - First registered user becomes admin
 - API routes under `src/app/api/`
 - Protected pages use the `(app)` route group
-- Default limits: 1000 tasks, 25MB uploads, 50 categories per user
+- Default limits: 1000 tasks, 50MB total uploads per task (10 files max), 50 categories per user

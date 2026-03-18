@@ -7,10 +7,13 @@ import path from 'path'
 
 const ALLOWED_EXTENSIONS = new Set([
   'pdf', 'txt', 'md', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
-  'csv', 'json', 'zip', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg',
+  'csv', 'json', 'rtf', 'odt',
+  'zip', 'rar', '7z', 'tar', 'gz',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
 ])
 
-const MAX_FILE_SIZE = 25 * 1024 * 1024
+const MAX_FILES_PER_TASK = 10
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50MB total per task
 
 export async function POST(req: Request) {
   const { error, session } = await requireAuth()
@@ -26,16 +29,23 @@ export async function POST(req: Request) {
   const task = db.prepare('SELECT id FROM tasks WHERE id = ? AND user_id = ?').get(taskId, session!.user.id)
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
-  const existingCount = (db.prepare('SELECT COUNT(*) as count FROM attachments WHERE task_id = ?').get(taskId) as { count: number }).count
-  if (existingCount + files.length > 10) {
-    return NextResponse.json({ error: 'Max 10 files per task' }, { status: 400 })
+  const existing = db.prepare(
+    'SELECT COUNT(*) as count, COALESCE(SUM(size), 0) as total_size FROM attachments WHERE task_id = ?'
+  ).get(taskId) as { count: number; total_size: number }
+
+  if (existing.count + files.length > MAX_FILES_PER_TASK) {
+    return NextResponse.json({ error: `Max ${MAX_FILES_PER_TASK} files per task` }, { status: 400 })
+  }
+
+  const newTotalSize = files.reduce((sum, f) => sum + f.size, 0)
+  if (existing.total_size + newTotalSize > MAX_TOTAL_SIZE) {
+    return NextResponse.json({ error: 'Total file size would exceed 50 MB limit' }, { status: 400 })
   }
 
   const uploaded = []
   for (const file of files) {
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
     if (!ALLOWED_EXTENSIONS.has(ext)) continue
-    if (file.size > MAX_FILE_SIZE) continue
 
     const id = generateId()
     const filename = `${id}.${ext}`

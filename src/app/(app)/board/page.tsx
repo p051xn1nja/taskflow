@@ -322,7 +322,7 @@ export default function BoardPage() {
     fetchTasks()
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -331,6 +331,10 @@ export default function BoardPage() {
     })
     setEditingTask(null)
     fetchTasks()
+  }
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
   }
 
   // Drag and drop handlers
@@ -462,6 +466,8 @@ export default function BoardPage() {
           categories={categories}
           onSubmit={handleEditSubmit}
           onCancel={() => setEditingTask(null)}
+          onDeleteAttachment={handleDeleteAttachment}
+          onFilesUploaded={() => fetchTasks()}
         />
       )}
     </div>
