@@ -1,59 +1,67 @@
-# taskflowTaskFlow (PHP)
-A PHP task app with authentication, persistent JSON storage, and day-based organization.
+# TaskFlow v2.0
 
-Run locally
-php -S 0.0.0.0:8000 -t .
-Then open http://localhost:8000/login.php.
+Modern task management platform built with Next.js, React, TypeScript, and SQLite.
 
-Login credentials
+## Tech Stack
 
-Username: user
+- **Framework**: Next.js 14 (App Router) + TypeScript
+- **UI**: Tailwind CSS with custom design system
+- **Database**: SQLite via better-sqlite3
+- **Auth**: NextAuth.js with credentials provider + bcrypt
+- **Icons**: Lucide React
+- **Deployment**: Docker container
 
-Password: pass
+## Features
 
+- Task CRUD with title, description, categories, tags, due dates
+- Adjustable per-task progress tracking (0-100%)
+- File attachments (up to 10 per task, 25MB each)
+- Category management with custom colors
+- Search, filter by category/status/date/tags
+- Day-based grouping with collapsible sections
+- Pagination
+- Role-based access (admin/user)
+- Admin panel: user management, platform settings
+- First registered user becomes admin
+- Beautiful dark theme with glassmorphism effects
 
-Features
+## Getting Started
 
-Login-gated access to the task app
+### Local Development
 
-Add tasks with title + description and selectable category
+```bash
+npm install
+npm run dev
+```
 
-Search tasks by title/description
+Open http://localhost:3000 - the first user you create becomes the admin.
 
-Filter tasks by category and date range
+### Docker Deployment
 
-Create, edit, and delete reusable categories with stored colors
+```bash
+docker compose up -d --build
+```
 
-Attach up to 10 files per task with per-file delete controls
+### Environment Variables
 
-Default grouping by day (collapsed sections with expandable day arrows)
+| Variable | Description | Default |
+|---|---|---|
+| `NEXTAUTH_SECRET` | JWT signing secret | `taskflow-secret-change-in-production` |
+| `NEXTAUTH_URL` | Base URL of the app | `http://localhost:3000` |
 
-Adjustable per-task progress (single slider control with live percentage)
+## Project Structure
 
-Pagination with per-page options (25/50/100/200/custom, default 50)
-
-File attachment upload/edit for tasks (up to 10 files per task, with per-file delete) (docx, pdf, txt, md, xlsx/xls, ppt/pptx, zip, php, js, css, html, py)
-
-Edit individual tasks (title + description)
-
-Mark tasks done / undone
-
-Delete tasks
-
-Data persisted in data/tasks.json
-
-
-
-Security hardening
-
-CSRF protection on login and all mutating form actions
-
-Strict input validation and sanitization
-
-Security headers (CSP, frame, referrer, nosniff, permissions)
-
-Session cookie hardening (HttpOnly, SameSite=Strict, subfolder-aware path)
-
-Atomic file writes with file locking and restrictive file permissions
-
-Session ID regeneration on successful login and basic login throttling
+```
+src/
+  app/
+    (app)/           # Authenticated app routes
+      page.tsx       # Tasks page
+      categories/    # Category management
+      admin/         # Admin panel (dashboard, users, settings)
+    login/           # Login/setup page
+    api/             # API routes (tasks, categories, uploads, admin)
+  components/        # React components
+  lib/               # Database, auth, utilities
+  types/             # TypeScript types
+data/                # SQLite database + uploads (gitignored)
+```

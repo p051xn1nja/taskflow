@@ -1,0 +1,44 @@
+import { NextResponse } from 'next/server'
+import { getDb } from '@/lib/db'
+import { requireAuth } from '@/lib/api-helpers'
+import { generateId } from '@/lib/utils'
+
+export async function GET() {
+  const { error, session } = await requireAuth()
+  if (error) return error
+
+  const db = getDb()
+  const categories = db.prepare(`
+    SELECT c.*, COUNT(t.id) as task_count
+    FROM categories c
+    LEFT JOIN tasks t ON c.id = t.category_id
+    WHERE c.user_id = ?
+    GROUP BY c.id
+    ORDER BY c.name ASC
+  `).all(session!.user.id)
+
+  return NextResponse.json(categories)
+}
+
+export async function POST(req: Request) {
+  const { error, session } = await requireAuth()
+  if (error) return error
+
+  const { name, color } = await req.json()
+
+  if (!name || name.trim().length === 0) {
+    return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+  }
+
+  if (name.length > 40) {
+    return NextResponse.json({ error: 'Name too long (max 40)' }, { status: 400 })
+  }
+
+  const db = getDb()
+  const id = generateId()
+  db.prepare('INSERT INTO categories (id, user_id, name, color) VALUES (?, ?, ?, ?)').run(
+    id, session!.user.id, name.trim(), color || '#64748b'
+  )
+
+  return NextResponse.json({ id }, { status: 201 })
+}
