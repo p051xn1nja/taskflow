@@ -151,8 +151,10 @@ describe('Schema: foreign keys', () => {
   it('cascades delete from task to tags', () => {
     const userId = seedUser(db)
     seedTask(db, userId, { id: 't1' })
-    db.prepare("INSERT INTO task_tags (id, task_id, name) VALUES ('tt1', 't1', 'urgent')").run()
-    db.prepare("INSERT INTO task_tags (id, task_id, name) VALUES ('tt2', 't1', 'bug')").run()
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag1', ?, 'urgent', '#ef4444')").run(userId)
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag2', ?, 'bug', '#f97316')").run(userId)
+    db.prepare("INSERT INTO task_tags (id, task_id, tag_id) VALUES ('tt1', 't1', 'tag1')").run()
+    db.prepare("INSERT INTO task_tags (id, task_id, tag_id) VALUES ('tt2', 't1', 'tag2')").run()
 
     db.prepare('DELETE FROM tasks WHERE id = ?').run('t1')
 

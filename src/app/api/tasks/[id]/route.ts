@@ -23,6 +23,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     description: 'description',
     category_id: 'category_id',
     status: 'status',
+    status_id: 'status_id',
     progress: 'progress',
     due_date: 'due_date',
   }
@@ -34,13 +35,25 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
+  // If status_id changed, sync the legacy status column
+  if ('status_id' in body && body.status_id) {
+    const newStatus = db.prepare('SELECT is_completed FROM statuses WHERE id = ?').get(body.status_id) as { is_completed: number } | undefined
+    if (newStatus) {
+      // Only update legacy status if not already being set
+      if (!('status' in body)) {
+        updates.push('status = ?')
+        values.push(newStatus.is_completed ? 'completed' : 'in_progress')
+      }
+    }
+  }
+
   if (updates.length > 0) {
     updates.push("updated_at = datetime('now')")
     values.push(params.id, session!.user.id)
     db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values)
   }
 
-  // Handle tags update — resolve names to master tag IDs
+  // Handle tags update
   if ('tags' in body && Array.isArray(body.tags)) {
     const userId = session!.user.id
     db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(params.id)
@@ -75,7 +88,6 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(params.id, session!.user.id)
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  // Delete attachment files
   const attachments = db.prepare('SELECT filename FROM attachments WHERE task_id = ?').all(params.id) as { filename: string }[]
   for (const att of attachments) {
     const filePath = path.join(UPLOADS_PATH, att.filename)

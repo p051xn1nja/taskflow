@@ -16,6 +16,7 @@ describe('Type contracts', () => {
       description: '',
       category_id: null,
       status: 'in_progress',
+      status_id: null,
       progress: 0,
       due_date: null,
       created_at: '2025-01-01',

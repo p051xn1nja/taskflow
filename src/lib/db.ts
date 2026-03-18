@@ -30,6 +30,24 @@ function generateId(): string {
   return require('crypto').randomUUID().replace(/-/g, '').slice(0, 24)
 }
 
+/** Seed default statuses for a user if they have none. */
+export function ensureDefaultStatuses(db: Database.Database, userId: string) {
+  const count = db.prepare('SELECT COUNT(*) as c FROM statuses WHERE user_id = ?').get(userId) as { c: number }
+  if (count.c > 0) return
+
+  const defaults = [
+    { name: 'To Do', color: '#64748b', position: 0, is_completed: 0, is_default: 1 },
+    { name: 'In Progress', color: '#3b82f6', position: 1, is_completed: 0, is_default: 0 },
+    { name: 'Completed', color: '#22c55e', position: 2, is_completed: 1, is_default: 0 },
+  ]
+  const stmt = db.prepare(
+    'INSERT INTO statuses (id, user_id, name, color, position, is_completed, is_default) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  )
+  for (const d of defaults) {
+    stmt.run(generateId(), userId, d.name, d.color, d.position, d.is_completed, d.is_default)
+  }
+}
+
 function initializeSchema(db: Database.Database) {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -53,6 +71,18 @@ function initializeSchema(db: Database.Database) {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS statuses (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#3b82f6',
+      position INTEGER NOT NULL DEFAULT 0,
+      is_completed INTEGER NOT NULL DEFAULT 0,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS tasks (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -60,6 +90,7 @@ function initializeSchema(db: Database.Database) {
       description TEXT NOT NULL DEFAULT '',
       category_id TEXT,
       status TEXT NOT NULL DEFAULT 'in_progress' CHECK(status IN ('in_progress', 'completed')),
+      status_id TEXT,
       progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
       due_date TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -144,6 +175,7 @@ function initializeSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_note_tasks_note_id ON note_tasks(note_id);
     CREATE INDEX IF NOT EXISTS idx_note_tasks_task_id ON note_tasks(task_id);
     CREATE INDEX IF NOT EXISTS idx_note_attachments_note_id ON note_attachments(note_id);
+    CREATE INDEX IF NOT EXISTS idx_statuses_user_id ON statuses(user_id);
   `)
 
   // Migrations: add columns that may not exist yet
@@ -153,8 +185,18 @@ function initializeSchema(db: Database.Database) {
     db.exec("ALTER TABLE users ADD COLUMN pending_approval INTEGER NOT NULL DEFAULT 0")
   }
 
+  // Migration: add status_id to tasks if missing
+  const taskColumns = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]
+  const taskColumnNames = taskColumns.map(c => c.name)
+  if (!taskColumnNames.includes('status_id')) {
+    db.exec("ALTER TABLE tasks ADD COLUMN status_id TEXT")
+  }
+
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)
+
+  // Migration: populate status_id for existing tasks
+  migrateTaskStatuses(db)
 
   // Insert default platform settings if not exist
   const insertSetting = db.prepare(
@@ -168,14 +210,44 @@ function initializeSchema(db: Database.Database) {
   insertSetting.run('require_admin_approval', 'false')
 }
 
+function migrateTaskStatuses(db: Database.Database) {
+  // For each user who has tasks but no statuses, seed defaults and assign
+  const usersWithTasks = db.prepare(
+    'SELECT DISTINCT user_id FROM tasks WHERE status_id IS NULL'
+  ).all() as { user_id: string }[]
+
+  for (const { user_id } of usersWithTasks) {
+    ensureDefaultStatuses(db, user_id)
+
+    const statuses = db.prepare(
+      'SELECT id, name, is_completed, is_default, position FROM statuses WHERE user_id = ? ORDER BY position'
+    ).all(user_id) as { id: string; name: string; is_completed: number; is_default: number; position: number }[]
+
+    const todoStatus = statuses.find(s => s.is_default) || statuses[0]
+    const inProgressStatus = statuses.find(s => !s.is_completed && !s.is_default && s.name === 'In Progress') || statuses.find(s => !s.is_completed && !s.is_default) || todoStatus
+    const completedStatus = statuses.find(s => s.is_completed) || statuses[statuses.length - 1]
+
+    // Map: in_progress+progress=0 → todo, in_progress+progress>0 → in_progress, completed → completed
+    db.prepare(
+      "UPDATE tasks SET status_id = ? WHERE user_id = ? AND status = 'in_progress' AND progress = 0 AND status_id IS NULL"
+    ).run(todoStatus.id, user_id)
+
+    db.prepare(
+      "UPDATE tasks SET status_id = ? WHERE user_id = ? AND status = 'in_progress' AND progress > 0 AND status_id IS NULL"
+    ).run(inProgressStatus.id, user_id)
+
+    db.prepare(
+      "UPDATE tasks SET status_id = ? WHERE user_id = ? AND status = 'completed' AND status_id IS NULL"
+    ).run(completedStatus.id, user_id)
+  }
+}
+
 function migrateTaskTags(db: Database.Database) {
-  // Check if task_tags table exists
   const taskTagsExists = db.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name='task_tags'"
   ).get()
 
   if (!taskTagsExists) {
-    // Fresh install: create with new schema
     db.exec(`
       CREATE TABLE task_tags (
         id TEXT PRIMARY KEY,
@@ -190,13 +262,10 @@ function migrateTaskTags(db: Database.Database) {
     return
   }
 
-  // Check if task_tags has old schema (name column)
   const ttColumns = db.prepare("PRAGMA table_info(task_tags)").all() as { name: string }[]
   const ttColumnNames = ttColumns.map(c => c.name)
 
   if (!ttColumnNames.includes('name')) {
-    // Already new schema
-    // Ensure indexes exist
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_task_tags_task_id ON task_tags(task_id);
       CREATE INDEX IF NOT EXISTS idx_task_tags_tag_id ON task_tags(tag_id);
@@ -205,21 +274,18 @@ function migrateTaskTags(db: Database.Database) {
   }
 
   // Old schema detected — migrate
-  // 1. Extract unique (user_id, tag_name) pairs
   const existingTags = db.prepare(`
     SELECT DISTINCT tt.name, t.user_id
     FROM task_tags tt
     JOIN tasks t ON tt.task_id = t.id
   `).all() as { name: string; user_id: string }[]
 
-  // 2. Insert into tags master table
   const insertTag = db.prepare('INSERT INTO tags (id, user_id, name, color) VALUES (?, ?, ?, ?)')
-  const tagMap = new Map<string, string>() // "userId:name" -> tagId
+  const tagMap = new Map<string, string>()
 
   for (const { name, user_id } of existingTags) {
     const key = `${user_id}:${name}`
     if (!tagMap.has(key)) {
-      // Check if tag already exists in master table
       const existing = db.prepare(
         'SELECT id FROM tags WHERE user_id = ? AND name = ?'
       ).get(user_id, name) as { id: string } | undefined
@@ -234,7 +300,6 @@ function migrateTaskTags(db: Database.Database) {
     }
   }
 
-  // 3. Create new junction table
   db.exec(`
     CREATE TABLE task_tags_new (
       id TEXT PRIMARY KEY,
@@ -245,7 +310,6 @@ function migrateTaskTags(db: Database.Database) {
     )
   `)
 
-  // 4. Migrate data
   const oldTags = db.prepare(`
     SELECT tt.id, tt.task_id, tt.name, t.user_id
     FROM task_tags tt
@@ -258,7 +322,6 @@ function migrateTaskTags(db: Database.Database) {
     if (tagId) insertMap.run(id, task_id, tagId)
   }
 
-  // 5. Replace old table
   db.exec('DROP TABLE task_tags')
   db.exec('ALTER TABLE task_tags_new RENAME TO task_tags')
   db.exec(`

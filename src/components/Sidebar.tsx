@@ -7,9 +7,11 @@ import {
   LayoutDashboard,
   CheckSquare,
   Columns3,
+  CalendarDays,
   Tag,
   Hash,
   FileText,
+  CircleDot,
   Shield,
   Users,
   Settings,
@@ -24,9 +26,11 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { href: '/', icon: CheckSquare, label: 'Tasks' },
   { href: '/board', icon: Columns3, label: 'Board' },
+  { href: '/calendar', icon: CalendarDays, label: 'Calendar' },
   { href: '/notes', icon: FileText, label: 'Notes' },
   { href: '/categories', icon: Tag, label: 'Categories' },
   { href: '/tags', icon: Hash, label: 'Tags' },
+  { href: '/statuses', icon: CircleDot, label: 'Statuses' },
 ]
 
 const adminItems = [

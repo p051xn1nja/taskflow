@@ -18,7 +18,7 @@ interface TaskCardProps {
 export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false)
 
-  const isCompleted = task.status === 'completed'
+  const isCompleted = task.task_status?.is_completed ?? task.status === 'completed'
 
   return (
     <div className={cn(
@@ -71,6 +71,18 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
                   }}
                 >
                   {task.category.name}
+                </span>
+              )}
+              {task.task_status && (
+                <span
+                  className="badge text-[10px] gap-0.5"
+                  style={{
+                    backgroundColor: task.task_status.color + '15',
+                    color: task.task_status.color,
+                    border: `1px solid ${task.task_status.color}25`,
+                  }}
+                >
+                  {task.task_status.name}
                 </span>
               )}
             </div>

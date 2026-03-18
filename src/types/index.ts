@@ -19,6 +19,18 @@ export interface Tag {
   note_count?: number
 }
 
+export interface Status {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  position: number
+  is_completed: boolean
+  is_default: boolean
+  created_at: string
+  task_count?: number
+}
+
 export interface Task {
   id: string
   user_id: string
@@ -26,6 +38,7 @@ export interface Task {
   description: string
   category_id: string | null
   status: 'in_progress' | 'completed'
+  status_id: string | null
   progress: number
   due_date: string | null
   created_at: string
@@ -33,6 +46,7 @@ export interface Task {
   tags: Tag[]
   attachments: Attachment[]
   category?: Category | null
+  task_status?: Status | null
 }
 
 export interface Category {

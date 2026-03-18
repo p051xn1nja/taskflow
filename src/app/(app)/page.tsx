@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
+import { useSearchParams } from 'next/navigation'
 import {
   Plus, Search, Filter, ChevronDown, ChevronRight, X,
   Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2,
@@ -9,12 +10,22 @@ import {
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
 import { cn, groupBy } from '@/lib/utils'
-import type { Task, Category } from '@/types'
+import type { Task, Category, Status } from '@/types'
 
 export default function TasksPage() {
+  return (
+    <Suspense fallback={null}>
+      <TasksPageInner />
+    </Suspense>
+  )
+}
+
+function TasksPageInner() {
   const { data: session } = useSession()
+  const searchParams = useSearchParams()
   const [tasks, setTasks] = useState<Task[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [statuses, setStatuses] = useState<Status[]>([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({ page: 1, per_page: 50, total: 0, total_pages: 0 })
 
@@ -30,6 +41,17 @@ export default function TasksPage() {
   // Form state
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [defaultDueDate, setDefaultDueDate] = useState('')
+
+  // Auto-open task form from calendar
+  useEffect(() => {
+    if (searchParams.get('new_task') === '1') {
+      setDefaultDueDate(searchParams.get('date') || '')
+      setShowForm(true)
+      // Clean up URL
+      window.history.replaceState({}, '', '/')
+    }
+  }, [searchParams])
 
   // Collapsed groups
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -39,7 +61,7 @@ export default function TasksPage() {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (filterCategory) params.set('category_id', filterCategory)
-    if (filterStatus) params.set('status', filterStatus)
+    if (filterStatus) params.set('status_id', filterStatus)
     if (filterTag) params.set('tag', filterTag)
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
@@ -58,8 +80,14 @@ export default function TasksPage() {
     setCategories(await res.json())
   }
 
+  const fetchStatuses = async () => {
+    const res = await fetch('/api/statuses')
+    setStatuses(await res.json())
+  }
+
   useEffect(() => {
     fetchCategories()
+    fetchStatuses()
   }, [])
 
   useEffect(() => {
@@ -122,8 +150,8 @@ export default function TasksPage() {
   })
 
   // Stats
-  const completedCount = tasks.filter(t => t.status === 'completed').length
-  const inProgressCount = tasks.filter(t => t.status === 'in_progress').length
+  const completedCount = tasks.filter(t => t.task_status?.is_completed ?? t.status === 'completed').length
+  const inProgressCount = tasks.filter(t => !(t.task_status?.is_completed ?? t.status === 'completed')).length
   const avgProgress = tasks.length > 0 ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length) : 0
 
   // Get all unique tags from tasks (tags are now objects with id, name, color)
@@ -232,9 +260,10 @@ export default function TasksPage() {
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
             >
-              <option value="">All Status</option>
-              <option value="in_progress">In Progress</option>
-              <option value="completed">Completed</option>
+              <option value="">All Statuses</option>
+              {statuses.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
             </select>
             <input
               type="date"
@@ -341,8 +370,9 @@ export default function TasksPage() {
       {showForm && (
         <TaskForm
           categories={categories}
+          defaultDueDate={defaultDueDate}
           onSubmit={handleCreateTask}
-          onCancel={() => setShowForm(false)}
+          onCancel={() => { setShowForm(false); setDefaultDueDate('') }}
         />
       )}
       {editingTask && (

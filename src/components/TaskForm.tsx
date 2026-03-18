@@ -33,6 +33,7 @@ function getFileIcon(filename: string) {
 interface TaskFormProps {
   task?: Task | null
   categories: Category[]
+  defaultDueDate?: string
   onSubmit: (data: {
     title: string
     description: string
@@ -46,13 +47,13 @@ interface TaskFormProps {
   onFilesUploaded?: () => void
 }
 
-export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachment, onFilesUploaded }: TaskFormProps) {
+export function TaskForm({ task, categories, defaultDueDate, onSubmit, onCancel, onDeleteAttachment, onFilesUploaded }: TaskFormProps) {
   const [title, setTitle] = useState(task?.title || '')
   const [description, setDescription] = useState(task?.description || '')
   const [categoryId, setCategoryId] = useState(task?.category_id || '')
   const [tags, setTags] = useState<string[]>(task?.tags?.map(t => typeof t === 'string' ? t : t.name) || [])
   const [tagInput, setTagInput] = useState('')
-  const [dueDate, setDueDate] = useState(task?.due_date || '')
+  const [dueDate, setDueDate] = useState(task?.due_date || defaultDueDate || '')
   const [progress, setProgress] = useState(task?.progress ?? 0)
 
   // Tag autocomplete

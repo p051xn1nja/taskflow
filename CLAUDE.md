@@ -29,8 +29,10 @@ src/
 │   │   ├── page.tsx          # Task list view
 │   │   ├── board/page.tsx    # Kanban board view
 │   │   ├── notes/            # Notes list + note editor ([id])
+│   │   ├── calendar/         # Calendar view (day/week/month/year)
 │   │   ├── categories/       # Category management
 │   │   ├── tags/             # Tag management (colors, CRUD)
+│   │   ├── statuses/         # Status management (workflow stages)
 │   │   └── admin/            # Admin panel (users, settings)
 │   ├── login/        # Auth pages
 │   ├── api/          # REST API endpoints
@@ -38,6 +40,8 @@ src/
 │   │   ├── categories/       # Category CRUD
 │   │   ├── tags/             # Tag CRUD (master tag table)
 │   │   ├── notes/            # Note CRUD
+│   │   ├── statuses/         # Status CRUD (user-defined workflow stages)
+│   │   ├── calendar/         # Calendar endpoint (tasks + notes by date range)
 │   │   ├── uploads/          # Task file upload, download, delete
 │   │   ├── note-uploads/     # Note file upload, download, delete
 │   │   ├── editor-upload/    # Rich editor inline image upload + serve
@@ -65,8 +69,19 @@ tests/
 ## Database
 
 Schema is defined inline in `src/lib/db.ts` and auto-creates on startup.
-Tables: `users`, `categories`, `tasks`, `tags`, `task_tags`, `notes`, `note_tags`, `note_tasks`, `note_attachments`, `attachments`, `platform_settings`.
+Tables: `users`, `categories`, `statuses`, `tasks`, `tags`, `task_tags`, `notes`, `note_tags`, `note_tasks`, `note_attachments`, `attachments`, `platform_settings`.
 SQLite runs in WAL mode with foreign keys enabled.
+
+### Statuses System
+
+Task workflow stages are user-defined via the `statuses` table:
+- `statuses` table: `(id, user_id, name, color, position, is_completed, is_default, created_at)`
+- Each user gets 3 default statuses seeded on first access: "To Do" (default), "In Progress", "Completed" (is_completed=1)
+- `tasks.status_id` references `statuses.id` — the legacy `tasks.status` column is kept in sync for backwards compat
+- `is_completed` flag determines done behavior (strikethrough, progress=100, opacity)
+- `is_default` marks which status new tasks get and where tasks go when their status is deleted
+- `position` controls column order on the Board view
+- Deleting a status reassigns all its tasks to the default status with progress=0
 
 ### Tags System
 
@@ -105,11 +120,12 @@ Notes have their own content model alongside tasks:
   - Expanded card view is read-only (description, tags with colors, attachments with download)
   - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
-- **Board** (`/board`): Kanban board with three columns (To Do, In Progress, Done)
-  - Columns derived from task `status` and `progress` fields — no extra schema
-  - To Do: `status='in_progress'` + `progress=0`; In Progress: `progress 1-99%`; Done: `status='completed'`
+- **Board** (`/board`): Kanban board with dynamic user-defined columns
+  - Columns driven by the user's `statuses` table, ordered by `position`
+  - Users can add, rename, reorder, and delete columns via `/statuses`
   - HTML5 native drag-and-drop (zero dependencies) with optimistic UI updates
-  - Moving cards updates `status` and `progress` via `PATCH /api/tasks/:id`
+  - Moving cards updates `status_id` and `progress` via `PATCH /api/tasks/:id`
+  - Dragging to a completed-status column sets progress=100; to default sets progress=0
   - Tag names displayed as colored badges on kanban cards
 - **Notes** (`/notes`): Card grid view with search, tag filters, pagination
   - Each card shows title, content preview (HTML stripped), tags, linked task count, attachment count
@@ -125,6 +141,21 @@ Notes have their own content model alongside tasks:
   - Task linking: search and link/unlink tasks to notes
   - File attachments: upload (drag-and-drop or browse), download, delete — same limits as tasks
   - Auto-save with 2s debounce + manual save button
+- **Calendar** (`/calendar`): Visual calendar view of tasks and notes
+  - Four view modes: Day, Week, Month, Year — toggle via toolbar buttons
+  - **Monthly**: Classic 7-column grid, items shown as colored pills, "+N more" overflow
+  - **Weekly**: 7-column card layout with detailed items per day
+  - **Daily**: Focused single-day view with items grouped by type (tasks, notes)
+  - **Yearly**: 4x3 mini-month grid with activity dot indicators, click to drill into month
+  - Tasks shown by `due_date`, notes shown by `created_at`
+  - Filters: category, status, tag, content type (tasks/notes/both)
+  - Navigation: prev/next arrows, "Today" quick button
+  - Create menu: "New Task" (redirects to tasks page with pre-filled due date) or "New Note"
+- **Statuses** (`/statuses`): Manage workflow stages for tasks
+  - CRUD for statuses with color picker and "marks as completed" toggle
+  - Drag-and-drop reordering (changes board column order)
+  - Default status indicated with badge; cannot be deleted
+  - Shows task count per status
 - **Tags** (`/tags`): Dedicated tag management view
   - CRUD for tags with color picker (12 presets + custom hex)
   - Shows task and note usage counts per tag
@@ -187,5 +218,8 @@ Managed via Admin → Settings (`platform_settings` table):
 - Default limits: 1000 tasks, 50MB total uploads per task/note (10 files max), 50 categories per user
 - Admin approval workflow: when enabled, new users get `pending_approval=true` until an admin activates them
 - Tags are centrally managed with colors — shared between tasks and notes
+- Statuses are user-defined workflow stages; default 3 seeded per user (To Do, In Progress, Completed)
+- Board columns are dynamic — driven by statuses table, fully customizable
 - Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
 - Note-task linking allows associating notes with related tasks (many-to-many)
+- Calendar view shows tasks (by due_date) and notes (by created_at) across day/week/month/year views

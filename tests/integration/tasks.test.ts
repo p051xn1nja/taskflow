@@ -127,24 +127,28 @@ describe('Task listing with filters (mirrors GET /api/tasks)', () => {
 describe('Task with tags', () => {
   it('adds tags to a task', () => {
     seedTask(db, userId, { id: 't1' })
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag1', ?, 'urgent', '#ef4444')").run(userId)
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag2', ?, 'frontend', '#3b82f6')").run(userId)
 
-    const insert = db.prepare('INSERT INTO task_tags (id, task_id, name) VALUES (?, ?, ?)')
-    insert.run('tt1', 't1', 'urgent')
-    insert.run('tt2', 't1', 'frontend')
+    const insert = db.prepare('INSERT INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)')
+    insert.run('tt1', 't1', 'tag1')
+    insert.run('tt2', 't1', 'tag2')
 
-    const tags = db.prepare('SELECT name FROM task_tags WHERE task_id = ?').all('t1') as { name: string }[]
+    const tags = db.prepare('SELECT tg.name FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = ?').all('t1') as { name: string }[]
     expect(tags.map(t => t.name)).toEqual(['urgent', 'frontend'])
   })
 
   it('replaces tags (mirrors PATCH tag update)', () => {
     seedTask(db, userId, { id: 't1' })
-    db.prepare("INSERT INTO task_tags (id, task_id, name) VALUES ('tt1', 't1', 'old-tag')").run()
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag-old', ?, 'old-tag', '#64748b')").run(userId)
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag-new', ?, 'new-tag', '#22c55e')").run(userId)
+    db.prepare("INSERT INTO task_tags (id, task_id, tag_id) VALUES ('tt1', 't1', 'tag-old')").run()
 
     // Delete + re-insert (what the API does)
     db.prepare('DELETE FROM task_tags WHERE task_id = ?').run('t1')
-    db.prepare("INSERT INTO task_tags (id, task_id, name) VALUES ('tt2', 't1', 'new-tag')").run()
+    db.prepare("INSERT INTO task_tags (id, task_id, tag_id) VALUES ('tt2', 't1', 'tag-new')").run()
 
-    const tags = db.prepare('SELECT name FROM task_tags WHERE task_id = ?').all('t1') as { name: string }[]
+    const tags = db.prepare('SELECT tg.name FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tt.task_id = ?').all('t1') as { name: string }[]
     expect(tags).toHaveLength(1)
     expect(tags[0].name).toBe('new-tag')
   })
@@ -152,10 +156,11 @@ describe('Task with tags', () => {
   it('filters tasks by tag', () => {
     seedTask(db, userId, { id: 't1', title: 'Tagged' })
     seedTask(db, userId, { id: 't2', title: 'Not tagged' })
-    db.prepare("INSERT INTO task_tags (id, task_id, name) VALUES ('tt1', 't1', 'urgent')").run()
+    db.prepare("INSERT INTO tags (id, user_id, name, color) VALUES ('tag-urg', ?, 'urgent', '#ef4444')").run(userId)
+    db.prepare("INSERT INTO task_tags (id, task_id, tag_id) VALUES ('tt1', 't1', 'tag-urg')").run()
 
     const tasks = db.prepare(
-      "SELECT * FROM tasks WHERE user_id = ? AND id IN (SELECT task_id FROM task_tags WHERE name = ?)"
+      "SELECT * FROM tasks WHERE user_id = ? AND id IN (SELECT tt.task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = ?)"
     ).all(userId, 'urgent')
     expect(tasks).toHaveLength(1)
   })
