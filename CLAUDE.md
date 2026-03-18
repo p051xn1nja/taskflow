@@ -16,6 +16,8 @@ Modern task management platform built with Next.js 14, SQLite, and NextAuth.
 - `npm run dev` — Start dev server
 - `npm run build` — Production build (standalone output)
 - `npm run start` — Start production server
+- `npm test` — Run test suite (Vitest, single run)
+- `npm run test:watch` — Run tests in watch mode
 
 ## Project Structure
 
@@ -29,6 +31,11 @@ src/
 ├── lib/              # Core: db.ts (schema), auth.ts, helpers
 └── types/            # TypeScript type definitions
 data/                 # SQLite DB + uploads (gitignored, mounted volume)
+tests/
+├── helpers/          # test-db.ts: in-memory SQLite with schema + seed helpers
+├── unit/             # Utils, types, DB schema/constraints
+├── integration/      # Task/category CRUD, filters, Kanban mapping
+└── build.test.ts     # TypeScript compilation, file/dep checks
 ```
 
 ## Database
@@ -60,6 +67,14 @@ SQLite runs in WAL mode with foreign keys enabled.
   - To Do: `status='in_progress'` + `progress=0`; In Progress: `progress 1-99%`; Done: `status='completed'`
   - HTML5 native drag-and-drop (zero dependencies) with optimistic UI updates
   - Moving cards updates `status` and `progress` via `PATCH /api/tasks/:id`
+
+## Testing
+
+- **Framework**: Vitest with in-memory SQLite (no external services needed)
+- **Run before submitting**: `npm test` — 91 tests across 7 files, ~2s
+- **Test DB helper**: `tests/helpers/test-db.ts` provides `createTestDb()`, `seedUser()`, `seedCategory()`, `seedTask()`
+- **Coverage**: utilities, type contracts, schema constraints, foreign key cascades, CRUD operations, Kanban column mapping, build integrity
+- **Adding tests**: Place unit tests in `tests/unit/`, integration tests in `tests/integration/`
 
 ## Key Conventions
 
