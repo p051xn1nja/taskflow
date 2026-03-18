@@ -110,9 +110,11 @@ Notes have their own content model alongside tasks:
 
 ## Environment Variables
 
-- `NEXTAUTH_SECRET` — Session encryption key (required, change from default)
+- `NEXTAUTH_SECRET` — Session encryption key (**required in production**; a dev-only fallback is used in development)
 - `NEXTAUTH_URL` — Public URL (`https://task.sidecloud.net`)
 - `NODE_ENV` — `production` in Docker
+
+> **Security**: Never commit real secrets. The repo uses a clearly-named dev-only fallback for `NEXTAUTH_SECRET`. Production deployments must set this env var to a unique random string.
 
 ## Views
 
@@ -188,7 +190,7 @@ Notes have their own content model alongside tasks:
 
 - **Framework**: Vitest with in-memory SQLite (no external services needed)
 - **Run before submitting**: `npm test` — 91 tests across 7 files, ~5s
-- **Test DB helper**: `tests/helpers/test-db.ts` provides `createTestDb()`, `seedUser()`, `seedCategory()`, `seedTask()`
+- **Test DB helper**: `tests/helpers/test-db.ts` provides `createTestDb()`, `seedUser()`, `seedCategory()`, `seedTask()`, `seedStatuses()`
 - **Coverage**: utilities, type contracts, schema constraints, foreign key cascades, CRUD operations, Kanban column mapping, build integrity
 - **Adding tests**: Place unit tests in `tests/unit/`, integration tests in `tests/integration/`
 
