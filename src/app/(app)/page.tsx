@@ -126,8 +126,10 @@ export default function TasksPage() {
   const inProgressCount = tasks.filter(t => t.status === 'in_progress').length
   const avgProgress = tasks.length > 0 ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length) : 0
 
-  // Get all unique tags from tasks
-  const allTags = [...new Set(tasks.flatMap(t => t.tags))]
+  // Get all unique tags from tasks (tags are now objects with id, name, color)
+  const allTags = tasks.flatMap(t => t.tags).filter((tag, i, arr) =>
+    arr.findIndex(t => t.name === tag.name) === i
+  )
 
   return (
     <div className="space-y-6">
@@ -256,7 +258,7 @@ export default function TasksPage() {
               >
                 <option value="">All Tags</option>
                 {allTags.map(t => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t.name} value={t.name}>{t.name}</option>
                 ))}
               </select>
             )}

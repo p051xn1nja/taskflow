@@ -8,6 +8,8 @@ import {
   CheckSquare,
   Columns3,
   Tag,
+  Hash,
+  FileText,
   Shield,
   Users,
   Settings,
@@ -22,7 +24,9 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { href: '/', icon: CheckSquare, label: 'Tasks' },
   { href: '/board', icon: Columns3, label: 'Board' },
+  { href: '/notes', icon: FileText, label: 'Notes' },
   { href: '/categories', icon: Tag, label: 'Categories' },
+  { href: '/tags', icon: Hash, label: 'Tags' },
 ]
 
 const adminItems = [
@@ -91,7 +95,9 @@ export function Sidebar() {
             </p>
           )}
           {navItems.map(item => {
-            const active = pathname === item.href
+            const active = item.href === '/'
+              ? pathname === '/'
+              : pathname.startsWith(item.href)
             return (
               <Link
                 key={item.href}

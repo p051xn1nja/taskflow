@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import {
-  Plus, Loader2, Calendar, Paperclip, Tag, GripVertical,
+  Plus, Loader2, Calendar, Paperclip, Hash, GripVertical,
   Circle, ArrowRight, CheckCircle2, Pencil, Trash2,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
@@ -132,6 +132,26 @@ function KanbanCard({
         </p>
       )}
 
+      {/* Tag badges */}
+      {task.tags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {task.tags.map(tag => (
+            <span
+              key={tag.id}
+              className="inline-flex items-center gap-0.5 px-1.5 py-0 rounded-md text-[10px] font-medium"
+              style={{
+                backgroundColor: tag.color + '15',
+                color: tag.color,
+                border: `1px solid ${tag.color}20`,
+              }}
+            >
+              <Hash className="w-2.5 h-2.5" />
+              {tag.name}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* Progress bar (only for in-progress) */}
       {!isDone && task.progress > 0 && (
         <div className="mt-3 flex items-center gap-2">
@@ -160,12 +180,6 @@ function KanbanCard({
           )}>
             <Calendar className="w-3 h-3" />
             {formatDate(task.due_date)}
-          </span>
-        )}
-        {task.tags.length > 0 && (
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-surface-800 bg-surface-300/30 px-1.5 py-0.5 rounded-md">
-            <Tag className="w-3 h-3" />
-            {task.tags.length}
           </span>
         )}
         {task.attachments.length > 0 && (
@@ -342,7 +356,6 @@ export default function BoardPage() {
     draggedTaskRef.current = task
     e.dataTransfer.effectAllowed = 'move'
     e.dataTransfer.setData('text/plain', task.id)
-    // Add a slight delay to allow the drag image to render
     const target = e.currentTarget as HTMLElement
     requestAnimationFrame(() => {
       target.style.opacity = '0.4'
@@ -358,7 +371,6 @@ export default function BoardPage() {
   const handleDragEnd = () => {
     setDragOverColumn(null)
     draggedTaskRef.current = null
-    // Reset opacity for all cards
     document.querySelectorAll('[draggable="true"]').forEach(el => {
       (el as HTMLElement).style.opacity = '1'
     })

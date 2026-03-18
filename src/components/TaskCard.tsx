@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   ChevronDown, ChevronRight, Pencil, Trash2, Check,
-  Paperclip, Tag, Calendar, Download, FileText,
+  Paperclip, Tag, Calendar, Download, FileText, Hash,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import type { Task } from '@/types'
@@ -75,6 +75,26 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
               )}
             </div>
 
+            {/* Tag badges inline */}
+            {task.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-1.5">
+                {task.tags.map(tag => (
+                  <span
+                    key={tag.id}
+                    className="inline-flex items-center gap-0.5 px-1.5 py-0 rounded-md text-[10px] font-medium"
+                    style={{
+                      backgroundColor: tag.color + '18',
+                      color: tag.color,
+                      border: `1px solid ${tag.color}20`,
+                    }}
+                  >
+                    <Hash className="w-2.5 h-2.5" />
+                    {tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
             {/* Meta row */}
             <div className="flex items-center gap-3 mt-1.5 text-xs text-surface-800 flex-wrap">
               <span>{formatDate(task.created_at)}</span>
@@ -86,11 +106,6 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
               {task.attachments.length > 0 && (
                 <span className="flex items-center gap-1">
                   <Paperclip className="w-3 h-3" /> {task.attachments.length}
-                </span>
-              )}
-              {task.tags.length > 0 && (
-                <span className="flex items-center gap-1">
-                  <Tag className="w-3 h-3" /> {task.tags.length}
                 </span>
               )}
             </div>
@@ -149,8 +164,17 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
                 <label className="text-xs font-medium text-surface-800 mb-1.5 block">Tags</label>
                 <div className="flex flex-wrap gap-1.5">
                   {task.tags.map(tag => (
-                    <span key={tag} className="badge bg-brand-600/10 text-brand-400 border border-brand-500/20">
-                      {tag}
+                    <span
+                      key={tag.id}
+                      className="badge gap-1"
+                      style={{
+                        backgroundColor: tag.color + '18',
+                        color: tag.color,
+                        border: `1px solid ${tag.color}25`,
+                      }}
+                    >
+                      <Hash className="w-3 h-3" />
+                      {tag.name}
                     </span>
                   ))}
                 </div>

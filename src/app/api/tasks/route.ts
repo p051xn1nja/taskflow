@@ -45,7 +45,7 @@ export async function GET(req: Request) {
     params.push(dateTo)
   }
   if (tag) {
-    where += ' AND t.id IN (SELECT task_id FROM task_tags WHERE name = ?)'
+    where += ' AND t.id IN (SELECT tt.task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = ?)'
     params.push(tag)
   }
 
@@ -64,12 +64,17 @@ export async function GET(req: Request) {
   `).all(...params, perPage, offset) as (Task & { category_name: string | null; category_color: string | null })[]
 
   // Get tags and attachments for each task
-  const getTagsStmt = db.prepare('SELECT name FROM task_tags WHERE task_id = ?')
+  const getTagsStmt = db.prepare(`
+    SELECT tg.id, tg.name, tg.color
+    FROM task_tags tt
+    JOIN tags tg ON tt.tag_id = tg.id
+    WHERE tt.task_id = ?
+  `)
   const getAttachmentsStmt = db.prepare('SELECT * FROM attachments WHERE task_id = ?')
 
   const enrichedTasks = tasks.map(task => ({
     ...task,
-    tags: (getTagsStmt.all(task.id) as { name: string }[]).map(t => t.name),
+    tags: getTagsStmt.all(task.id) as { id: string; name: string; color: string }[],
     attachments: getAttachmentsStmt.all(task.id),
     category: task.category_id ? { id: task.category_id, name: task.category_name!, color: task.category_color! } : null,
   }))
@@ -104,11 +109,24 @@ export async function POST(req: Request) {
     VALUES (?, ?, ?, ?, ?, ?)
   `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, due_date || null)
 
-  // Insert tags
+  // Insert tags — resolve names to master tag IDs (find or create)
   if (tags && Array.isArray(tags)) {
-    const insertTag = db.prepare('INSERT INTO task_tags (id, task_id, name) VALUES (?, ?, ?)')
-    for (const tag of tags.slice(0, 10)) {
-      if (tag.trim()) insertTag.run(generateId(), id, tag.trim().slice(0, 30))
+    const findTag = db.prepare('SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE')
+    const insertTag = db.prepare('INSERT INTO tags (id, user_id, name, color) VALUES (?, ?, ?, ?)')
+    const insertTaskTag = db.prepare('INSERT INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)')
+
+    for (const tagName of tags.slice(0, 10)) {
+      const trimmed = typeof tagName === 'string' ? tagName.trim().slice(0, 30) : ''
+      if (!trimmed) continue
+
+      let tagRow = findTag.get(userId, trimmed) as { id: string } | undefined
+      if (!tagRow) {
+        const newTagId = generateId()
+        insertTag.run(newTagId, userId, trimmed, '#3b82f6')
+        tagRow = { id: newTagId }
+      }
+
+      insertTaskTag.run(generateId(), id, tagRow.id)
     }
   }
 

@@ -86,3 +86,118 @@
     @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 }
+
+/* TipTap Rich Editor Styles */
+.rich-editor-content {
+  @apply px-4 py-3 text-sm text-surface-950 min-h-[300px] outline-none;
+}
+
+.rich-editor-content > * {
+  @apply my-0;
+}
+
+.rich-editor-content p {
+  @apply mb-2 leading-relaxed;
+}
+
+.rich-editor-content h1 {
+  @apply text-2xl font-bold text-white mb-3 mt-4;
+}
+
+.rich-editor-content h2 {
+  @apply text-xl font-semibold text-white mb-2.5 mt-3;
+}
+
+.rich-editor-content h3 {
+  @apply text-lg font-semibold text-surface-950 mb-2 mt-3;
+}
+
+.rich-editor-content ul {
+  @apply list-disc pl-6 mb-2 space-y-0.5;
+}
+
+.rich-editor-content ol {
+  @apply list-decimal pl-6 mb-2 space-y-0.5;
+}
+
+.rich-editor-content li {
+  @apply leading-relaxed;
+}
+
+.rich-editor-content li p {
+  @apply mb-0;
+}
+
+.rich-editor-content blockquote {
+  @apply border-l-[3px] border-brand-500/40 pl-4 italic text-surface-800 my-3;
+}
+
+.rich-editor-content pre {
+  @apply bg-surface-200/60 rounded-lg p-3 my-3 overflow-x-auto text-xs font-mono;
+}
+
+.rich-editor-content code {
+  @apply bg-surface-300/40 rounded px-1.5 py-0.5 text-xs font-mono text-accent-cyan;
+}
+
+.rich-editor-content pre code {
+  @apply bg-transparent p-0 text-surface-950;
+}
+
+.rich-editor-content hr {
+  @apply border-surface-400/30 my-4;
+}
+
+.rich-editor-content a.editor-link {
+  @apply text-brand-400 underline decoration-brand-400/40 hover:decoration-brand-400 cursor-pointer;
+}
+
+.rich-editor-content img.editor-image {
+  @apply rounded-lg max-w-full h-auto my-3 border border-surface-300/20;
+}
+
+.rich-editor-content mark {
+  @apply rounded px-0.5;
+}
+
+/* Table styles */
+.rich-editor-content table.editor-table {
+  border-collapse: collapse;
+  width: var(--table-width, 100%);
+  @apply my-3;
+}
+
+.rich-editor-content table.editor-table td,
+.rich-editor-content table.editor-table th {
+  border-width: var(--table-border-width, 1px);
+  border-style: solid;
+  border-color: var(--table-border-color, theme('colors.surface.400 / 30%'));
+  padding: var(--table-cell-padding, 8px);
+  @apply text-sm relative;
+}
+
+.rich-editor-content table.editor-table th {
+  @apply bg-surface-200/60 font-semibold text-surface-950;
+}
+
+.rich-editor-content table.editor-table td {
+  @apply bg-surface-100/40;
+}
+
+.rich-editor-content table.editor-table .selectedCell {
+  @apply bg-brand-600/15;
+}
+
+.rich-editor-content table.editor-table .column-resize-handle {
+  @apply absolute top-0 right-[-2px] bottom-[-2px] w-1 bg-brand-500/50 pointer-events-none;
+}
+
+.rich-editor-content .tableWrapper {
+  @apply overflow-x-auto my-3;
+}
+
+/* Placeholder */
+.rich-editor-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply text-surface-700 pointer-events-none float-left h-0;
+}

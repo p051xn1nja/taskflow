@@ -3,10 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X, Plus, Upload, FileText, Download, Trash2, AlertCircle,
-  Image as ImageIcon, FileArchive, FileSpreadsheet,
+  Image as ImageIcon, FileArchive, FileSpreadsheet, Hash,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
-import type { Task, Category, Attachment } from '@/types'
+import type { Task, Category, Attachment, Tag } from '@/types'
 
 const ALLOWED_EXTENSIONS = new Set([
   'pdf', 'txt', 'md', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
@@ -50,10 +50,15 @@ export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachm
   const [title, setTitle] = useState(task?.title || '')
   const [description, setDescription] = useState(task?.description || '')
   const [categoryId, setCategoryId] = useState(task?.category_id || '')
-  const [tags, setTags] = useState<string[]>(task?.tags || [])
+  const [tags, setTags] = useState<string[]>(task?.tags?.map(t => typeof t === 'string' ? t : t.name) || [])
   const [tagInput, setTagInput] = useState('')
   const [dueDate, setDueDate] = useState(task?.due_date || '')
   const [progress, setProgress] = useState(task?.progress ?? 0)
+
+  // Tag autocomplete
+  const [allTags, setAllTags] = useState<Tag[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const tagInputRef = useRef<HTMLInputElement>(null)
 
   // File management
   const [attachments, setAttachments] = useState<Attachment[]>(task?.attachments || [])
@@ -79,11 +84,22 @@ export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachm
     return () => window.removeEventListener('keydown', handler)
   }, [onCancel])
 
-  const addTag = () => {
-    const t = tagInput.trim()
+  // Fetch all tags for autocomplete
+  useEffect(() => {
+    fetch('/api/tags').then(r => r.json()).then(setAllTags).catch(() => {})
+  }, [])
+
+  const filteredSuggestions = allTags.filter(t =>
+    t.name.toLowerCase().includes(tagInput.toLowerCase()) &&
+    !tags.includes(t.name)
+  ).slice(0, 8)
+
+  const addTag = (name?: string) => {
+    const t = (name || tagInput).trim()
     if (t && !tags.includes(t) && tags.length < 10) {
       setTags([...tags, t])
       setTagInput('')
+      setShowSuggestions(false)
     }
   }
 
@@ -102,7 +118,6 @@ export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachm
 
     if (valid.length === 0) return
 
-    // Check count limit
     const availableSlots = MAX_FILES - totalCount
     if (availableSlots <= 0) {
       setFileError(`Maximum ${MAX_FILES} files per task`)
@@ -113,7 +128,6 @@ export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachm
       setFileError(`Only ${availableSlots} more file${availableSlots > 1 ? 's' : ''} allowed`)
     }
 
-    // Check size limit
     const newSize = filesToAdd.reduce((sum, f) => sum + f.size, 0)
     if (totalSize + newSize > MAX_TOTAL_SIZE) {
       setFileError(`Total file size would exceed 50 MB limit`)
@@ -196,6 +210,12 @@ export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachm
     progress >= 50 ? 'text-brand-400' : 'text-accent-amber'
 
   const acceptStr = Array.from(ALLOWED_EXTENSIONS).map(e => `.${e}`).join(',')
+
+  // Get tag color for display
+  const getTagColor = (name: string) => {
+    const found = allTags.find(t => t.name.toLowerCase() === name.toLowerCase())
+    return found?.color || '#3b82f6'
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -302,41 +322,72 @@ export function TaskForm({ task, categories, onSubmit, onCancel, onDeleteAttachm
             </label>
             {tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                {tags.map(tag => (
-                  <span
-                    key={tag}
-                    className="badge bg-brand-600/10 text-brand-400 border border-brand-500/20 gap-1"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => setTags(tags.filter(t => t !== tag))}
-                      className="hover:text-accent-red"
+                {tags.map(tag => {
+                  const tagColor = getTagColor(tag)
+                  return (
+                    <span
+                      key={tag}
+                      className="badge gap-1"
+                      style={{
+                        backgroundColor: tagColor + '18',
+                        color: tagColor,
+                        border: `1px solid ${tagColor}25`,
+                      }}
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
+                      <Hash className="w-3 h-3" />
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => setTags(tags.filter(t => t !== tag))}
+                        className="hover:opacity-70"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )
+                })}
               </div>
             )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="input-base flex-1"
-                placeholder="Add a tag..."
-                value={tagInput}
-                onChange={e => setTagInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
-                maxLength={30}
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                disabled={!tagInput.trim() || tags.length >= 10}
-                className="btn-secondary px-3"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
+            <div className="relative">
+              <div className="flex gap-2">
+                <input
+                  ref={tagInputRef}
+                  type="text"
+                  className="input-base flex-1"
+                  placeholder="Add a tag..."
+                  value={tagInput}
+                  onChange={e => { setTagInput(e.target.value); setShowSuggestions(true) }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
+                  maxLength={30}
+                />
+                <button
+                  type="button"
+                  onClick={() => addTag()}
+                  disabled={!tagInput.trim() || tags.length >= 10}
+                  className="btn-secondary px-3"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Autocomplete dropdown */}
+              {showSuggestions && tagInput && filteredSuggestions.length > 0 && (
+                <div className="absolute left-0 right-12 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 overflow-hidden">
+                  {filteredSuggestions.map(tag => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-surface-300/30 transition-colors"
+                      onMouseDown={e => { e.preventDefault(); addTag(tag.name) }}
+                    >
+                      <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                      <span className="text-surface-900">{tag.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

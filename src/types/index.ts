@@ -9,6 +9,16 @@ export interface User {
   updated_at: string
 }
 
+export interface Tag {
+  id: string
+  user_id: string
+  name: string
+  color: string
+  created_at: string
+  task_count?: number
+  note_count?: number
+}
+
 export interface Task {
   id: string
   user_id: string
@@ -20,7 +30,7 @@ export interface Task {
   due_date: string | null
   created_at: string
   updated_at: string
-  tags: string[]
+  tags: Tag[]
   attachments: Attachment[]
   category?: Category | null
 }
@@ -44,6 +54,35 @@ export interface Attachment {
   created_at: string
 }
 
+export interface NoteAttachment {
+  id: string
+  note_id: string
+  filename: string
+  original_name: string
+  mime_type: string
+  size: number
+  created_at: string
+}
+
+export interface Note {
+  id: string
+  user_id: string
+  title: string
+  content: string
+  created_at: string
+  updated_at: string
+  tags: Tag[]
+  attachments: NoteAttachment[]
+  linked_tasks: LinkedTask[]
+}
+
+export interface LinkedTask {
+  id: string
+  title: string
+  status: 'in_progress' | 'completed'
+  progress: number
+}
+
 export interface PlatformSettings {
   app_name: string
   max_tasks_per_user: string
@@ -59,6 +98,13 @@ export interface TaskFilters {
   tag?: string
   date_from?: string
   date_to?: string
+  page?: number
+  per_page?: number
+}
+
+export interface NoteFilters {
+  search?: string
+  tag?: string
   page?: number
   per_page?: number
 }

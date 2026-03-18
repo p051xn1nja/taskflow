@@ -9,6 +9,7 @@ Modern task management platform built with Next.js 14, SQLite, and NextAuth.
 - **Database**: SQLite via better-sqlite3 (`/data/taskflow.db`, auto-initialized)
 - **Auth**: NextAuth.js v4 (credentials provider, JWT sessions, bcryptjs)
 - **Validation**: Zod
+- **Rich Editor**: TipTap (tables, images, colors, alignment, links, highlights)
 - **Deployment**: Docker → GHCR (`ghcr.io/p051xn1nja/taskflow:latest`)
 
 ## Commands
@@ -24,23 +25,30 @@ Modern task management platform built with Next.js 14, SQLite, and NextAuth.
 ```
 src/
 ├── app/              # Next.js App Router
-│   ├── (app)/        # Protected routes (tasks, board, categories, admin)
+│   ├── (app)/        # Protected routes (tasks, board, notes, categories, tags, admin)
 │   │   ├── page.tsx          # Task list view
 │   │   ├── board/page.tsx    # Kanban board view
+│   │   ├── notes/            # Notes list + note editor ([id])
 │   │   ├── categories/       # Category management
+│   │   ├── tags/             # Tag management (colors, CRUD)
 │   │   └── admin/            # Admin panel (users, settings)
 │   ├── login/        # Auth pages
 │   ├── api/          # REST API endpoints
 │   │   ├── tasks/            # Task CRUD + per-task endpoints
 │   │   ├── categories/       # Category CRUD
-│   │   ├── uploads/          # File upload, download, delete
+│   │   ├── tags/             # Tag CRUD (master tag table)
+│   │   ├── notes/            # Note CRUD
+│   │   ├── uploads/          # Task file upload, download, delete
+│   │   ├── note-uploads/     # Note file upload, download, delete
+│   │   ├── editor-upload/    # Rich editor inline image upload + serve
 │   │   ├── admin/            # Admin: users CRUD, platform settings
 │   │   └── auth/             # NextAuth + initial setup
 │   ├── icon.tsx      # 32x32 PNG favicon (generated at build time)
 │   └── apple-icon.tsx # 180x180 Apple Touch icon (generated at build time)
 ├── components/       # React components + UI library
 │   ├── TaskCard.tsx          # List view task card (read-only expanded view)
-│   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags)
+│   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags with autocomplete)
+│   ├── RichEditor.tsx        # TipTap rich HTML editor (tables, images, colors, alignment)
 │   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
 │   ├── Sidebar.tsx           # Navigation sidebar
 │   └── Providers.tsx         # NextAuth session provider
@@ -57,8 +65,23 @@ tests/
 ## Database
 
 Schema is defined inline in `src/lib/db.ts` and auto-creates on startup.
-Tables: `users`, `categories`, `tasks`, `task_tags`, `attachments`, `platform_settings`.
+Tables: `users`, `categories`, `tasks`, `tags`, `task_tags`, `notes`, `note_tags`, `note_tasks`, `note_attachments`, `attachments`, `platform_settings`.
 SQLite runs in WAL mode with foreign keys enabled.
+
+### Tags System
+
+Tags are managed via a master `tags` table with `(id, user_id, name, color)`. Tags are shared between tasks and notes:
+- `task_tags` junction: `(id, task_id, tag_id)` — links tags to tasks
+- `note_tags` junction: `(id, note_id, tag_id)` — links tags to notes
+- Migration from old free-form `task_tags.name` to master tag references is handled automatically in `db.ts`
+
+### Notes System
+
+Notes have their own content model alongside tasks:
+- `notes` table: `(id, user_id, title, content, created_at, updated_at)` — content is HTML from the rich editor
+- `note_tags`: Links notes to tags
+- `note_tasks`: Links notes to tasks (many-to-many)
+- `note_attachments`: File attachments for notes (same schema as `attachments`)
 
 ## Deployment
 
@@ -79,17 +102,38 @@ SQLite runs in WAL mode with foreign keys enabled.
 ## Views
 
 - **Tasks** (`/`): List view with filters, search, pagination
-  - Expanded card view is read-only (description, tags, attachments with download)
+  - Expanded card view is read-only (description, tags with colors, attachments with download)
+  - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
 - **Board** (`/board`): Kanban board with three columns (To Do, In Progress, Done)
   - Columns derived from task `status` and `progress` fields — no extra schema
   - To Do: `status='in_progress'` + `progress=0`; In Progress: `progress 1-99%`; Done: `status='completed'`
   - HTML5 native drag-and-drop (zero dependencies) with optimistic UI updates
   - Moving cards updates `status` and `progress` via `PATCH /api/tasks/:id`
+  - Tag names displayed as colored badges on kanban cards
+- **Notes** (`/notes`): Card grid view with search, tag filters, pagination
+  - Each card shows title, content preview (HTML stripped), tags, linked task count, attachment count
+  - Click to open full note editor
+- **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
+  - TipTap rich HTML editor: bold, italic, underline, strikethrough, code, headings (H1-H3)
+  - Text colors (12 presets), highlight colors, text alignment (left, center, right, justify)
+  - Bullet lists, ordered lists, blockquotes, horizontal rules, code blocks
+  - Tables: insert with configurable rows/cols, add/delete rows/columns, table settings modal (border width, border color, cell padding, width)
+  - Images: upload via toolbar button, pasted/dropped images uploaded to `/api/editor-upload`
+  - Links: add/remove with URL input
+  - Tag management with autocomplete from master tags
+  - Task linking: search and link/unlink tasks to notes
+  - File attachments: upload (drag-and-drop or browse), download, delete — same limits as tasks
+  - Auto-save with 2s debounce + manual save button
+- **Tags** (`/tags`): Dedicated tag management view
+  - CRUD for tags with color picker (12 presets + custom hex)
+  - Shows task and note usage counts per tag
+  - Tags are shared across tasks and notes
 - **Edit Modal** (`TaskForm`): Unified edit experience for both list and board views
   - Progress slider (edit mode only) — updates task progress directly
   - File attachments: upload (drag-and-drop or browse), download, and delete
-  - Tags, category, due date, title, description editing
+  - Tags with autocomplete dropdown from master tags, colored badges
+  - Category, due date, title, description editing
   - New files are staged and uploaded on save; attachment deletes are immediate
 - **Admin Panel** (`/admin`): Admin-only dashboard
   - **Users** (`/admin/users`): Manage users — activate/deactivate, approve pending registrations, delete
@@ -97,20 +141,22 @@ SQLite runs in WAL mode with foreign keys enabled.
 
 ## File Uploads
 
-- **Limits**: Max 10 files per task, 50 MB total per task
+- **Limits**: Max 10 files per task/note, 50 MB total per task/note
 - **Allowed extensions**:
   - Documents: pdf, txt, md, docx, doc, xlsx, xls, pptx, ppt, csv, json, rtf, odt
   - Archives: zip, rar, 7z, tar, gz
   - Images: png, jpg, jpeg, gif, webp, svg, bmp
-- **Storage**: `/data/uploads/{id}.{ext}` with metadata in `attachments` table
-- **Upload**: Inline in edit modal with drag-and-drop zone; files staged before save
+- **Storage**: `/data/uploads/{id}.{ext}` with metadata in `attachments` / `note_attachments` tables
+- **Upload**: Inline in edit modal/note editor with drag-and-drop zone; files staged before save
 - **Management**: Download and delete individual attachments in edit mode
-- **API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
+- **Task API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
+- **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download), `DELETE /api/note-uploads/:id` (delete)
+- **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
 
 ## Testing
 
 - **Framework**: Vitest with in-memory SQLite (no external services needed)
-- **Run before submitting**: `npm test` — 91 tests across 7 files, ~2s
+- **Run before submitting**: `npm test` — 91 tests across 7 files, ~5s
 - **Test DB helper**: `tests/helpers/test-db.ts` provides `createTestDb()`, `seedUser()`, `seedCategory()`, `seedTask()`
 - **Coverage**: utilities, type contracts, schema constraints, foreign key cascades, CRUD operations, Kanban column mapping, build integrity
 - **Adding tests**: Place unit tests in `tests/unit/`, integration tests in `tests/integration/`
@@ -138,5 +184,8 @@ Managed via Admin → Settings (`platform_settings` table):
 - First registered user becomes admin
 - API routes under `src/app/api/`
 - Protected pages use the `(app)` route group
-- Default limits: 1000 tasks, 50MB total uploads per task (10 files max), 50 categories per user
+- Default limits: 1000 tasks, 50MB total uploads per task/note (10 files max), 50 categories per user
 - Admin approval workflow: when enabled, new users get `pending_approval=true` until an admin activates them
+- Tags are centrally managed with colors — shared between tasks and notes
+- Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
+- Note-task linking allows associating notes with related tasks (many-to-many)
