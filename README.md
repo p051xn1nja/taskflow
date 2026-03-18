@@ -46,7 +46,7 @@ docker compose up -d --build
 
 | Variable | Description | Default |
 |---|---|---|
-| `NEXTAUTH_SECRET` | JWT signing secret | `taskflow-secret-change-in-production` |
+| `NEXTAUTH_SECRET` | JWT signing secret (required) | — |
 | `NEXTAUTH_URL` | Base URL of the app | `http://localhost:3000` |
 
 ## Project Structure
