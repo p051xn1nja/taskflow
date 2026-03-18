@@ -95,6 +95,13 @@ SQLite runs in WAL mode with foreign keys enabled.
 - **Coverage**: utilities, type contracts, schema constraints, foreign key cascades, CRUD operations, Kanban column mapping, build integrity
 - **Adding tests**: Place unit tests in `tests/unit/`, integration tests in `tests/integration/`
 
+## Favicon
+
+- Generated at build time via Next.js `ImageResponse` (no static assets)
+- `src/app/icon.tsx` — 32x32 PNG favicon (browser tabs)
+- `src/app/apple-icon.tsx` — 180x180 Apple Touch icon (mobile bookmarks)
+- Design: white checkmark on brand-blue gradient (`#1a75f5` → `#2a91ff`), rounded corners
+
 ## Key Conventions
 
 - First registered user becomes admin
