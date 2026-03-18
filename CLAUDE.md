@@ -66,6 +66,7 @@ SQLite runs in WAL mode with foreign keys enabled.
 - **Port**: 7776 → container 3000
 - **Image**: `ghcr.io/p051xn1nja/taskflow:latest`
 - **CI**: GitHub Actions builds and pushes to GHCR on push to `main` (`.github/workflows/docker-publish.yml`)
+  - Actions: `actions/checkout@v5`, `docker/login-action@v4`, `docker/metadata-action@v6`, `docker/build-push-action@v6` (Node.js 24-compatible)
 - **Volumes**: DB and uploads persist at `/var/www/vhosts/sidecloud.net/docker/taskflow/`
 - **Deploy on server**: `docker compose pull && docker compose up -d`
 
