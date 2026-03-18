@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   LayoutDashboard,
   CheckSquare,
+  Columns3,
   Tag,
   Shield,
   Users,
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/', icon: CheckSquare, label: 'Tasks' },
+  { href: '/board', icon: Columns3, label: 'Board' },
   { href: '/categories', icon: Tag, label: 'Categories' },
 ]
 
