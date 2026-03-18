@@ -1,12 +1,7 @@
 FROM node:22-alpine AS base
 
-# Install dependencies for better-sqlite3
+# Install dependencies for better-sqlite3 native compilation
 RUN apk add --no-cache python3 make g++
-
-FROM base AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
 
 FROM base AS builder
 WORKDIR /app
@@ -18,6 +13,7 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
+# Native deps for better-sqlite3 at runtime
 RUN apk add --no-cache python3 make g++
 
 ENV NODE_ENV=production
@@ -28,11 +24,17 @@ ENV PORT=3000
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copy built application
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Create data directory for SQLite
+# Copy entrypoint and start scripts
+COPY --chown=nextjs:nodejs docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --chown=nextjs:nodejs start.sh ./start.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh ./start.sh
+
+# Create data directory for SQLite + uploads
 RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data
 
 VOLUME /app/data
@@ -41,4 +43,5 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["./start.sh"]

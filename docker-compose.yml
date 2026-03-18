@@ -1,19 +1,19 @@
-version: '3.8'
-
+version: "3.8"
 services:
   taskflow:
     build: .
     container_name: taskflow
     restart: unless-stopped
+    working_dir: /app
+    command: ./start.sh
+    entrypoint: docker-entrypoint.sh
+    hostname: taskflow
     ports:
       - "3000:3000"
-    volumes:
-      - taskflow-data:/app/data
     environment:
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-to-a-long-random-string}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - NEXTAUTH_SECRET=change-me-to-a-long-random-string
+      - NEXTAUTH_URL=https://yourdomain.com
       - NODE_ENV=production
-
-volumes:
-  taskflow-data:
-    driver: local
+    volumes:
+      - /var/www/vhosts/sidecloud.net/docker/taskflow/data:/app/data
+      - /var/www/vhosts/sidecloud.net/docker/taskflow/uploads:/app/data/uploads
