@@ -9,10 +9,10 @@ services:
     entrypoint: docker-entrypoint.sh
     hostname: taskflow
     ports:
-      - "3000:3000"
+      - "7776:3000"
     environment:
       - NEXTAUTH_SECRET=change-me-to-a-long-random-string
-      - NEXTAUTH_URL=https://yourdomain.com
+      - NEXTAUTH_URL=https://task.sidecloud.net
       - NODE_ENV=production
     volumes:
       - /var/www/vhosts/sidecloud.net/docker/taskflow/data:/app/data
