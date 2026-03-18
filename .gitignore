@@ -21,8 +21,7 @@ npm-debug.log*
 .env*.local
 
 # data
-data/*.db
-data/uploads/
+data/
 
 # old php
 old-php/
