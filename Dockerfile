@@ -13,8 +13,8 @@ RUN npm run build
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-# Native deps for better-sqlite3 at runtime
-RUN apk add --no-cache python3 make g++
+# Native deps for better-sqlite3 at runtime + su-exec for entrypoint privilege drop
+RUN apk add --no-cache python3 make g++ su-exec
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -38,8 +38,6 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh ./start.sh
 RUN mkdir -p /app/data/uploads && chown -R nextjs:nodejs /app/data
 
 VOLUME /app/data
-
-USER nextjs
 
 EXPOSE 3000
 

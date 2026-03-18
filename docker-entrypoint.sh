@@ -1,10 +1,11 @@
 #!/bin/sh
 set -e
 
-# Ensure data directories exist
+# Ensure data directories exist and are writable by nextjs user
 mkdir -p /app/data/uploads
+chown -R nextjs:nodejs /app/data
 
-# Run any initialization if needed
 echo "TaskFlow entrypoint: environment ready"
 
-exec "$@"
+# Drop privileges and run the command as nextjs
+exec su-exec nextjs "$@"
