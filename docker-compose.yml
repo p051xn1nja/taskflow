@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   taskflow:
     image: ghcr.io/p051xn1nja/taskflow:latest
