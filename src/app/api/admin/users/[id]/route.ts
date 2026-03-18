@@ -36,6 +36,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     updates.push('is_active = ?')
     values.push(body.is_active ? 1 : 0)
   }
+  if (body.pending_approval !== undefined) {
+    updates.push('pending_approval = ?')
+    values.push(body.pending_approval ? 1 : 0)
+  }
   if (body.password) {
     const passwordHash = await hash(body.password, 12)
     updates.push('password_hash = ?')

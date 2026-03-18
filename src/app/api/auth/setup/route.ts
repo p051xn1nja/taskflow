@@ -46,9 +46,20 @@ export async function POST(req: Request) {
   const passwordHash = await hash(password, 12)
   const id = generateId()
 
+  // Check if admin approval is required for new registrations
+  let needsApproval = false
+  if (!isFirstUser) {
+    const approvalSetting = db.prepare("SELECT value FROM platform_settings WHERE key = 'require_admin_approval'").get() as { value: string } | undefined
+    needsApproval = approvalSetting?.value === 'true'
+  }
+
   db.prepare(
-    'INSERT INTO users (id, username, email, password_hash, display_name, role) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(id, username, email, passwordHash, display_name || username, isFirstUser ? 'admin' : 'user')
+    'INSERT INTO users (id, username, email, password_hash, display_name, role, is_active, pending_approval) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+  ).run(id, username, email, passwordHash, display_name || username, isFirstUser ? 'admin' : 'user', needsApproval ? 0 : 1, needsApproval ? 1 : 0)
+
+  if (needsApproval) {
+    return NextResponse.json({ success: true, pending_approval: true })
+  }
 
   return NextResponse.json({ success: true, role: isFirstUser ? 'admin' : 'user' })
 }

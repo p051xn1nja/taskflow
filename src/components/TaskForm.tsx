@@ -60,7 +60,7 @@ export function TaskForm({ task, categories, onSubmit, onCancel }: TaskFormProps
           <h2 className="text-lg font-semibold text-white">
             {task ? 'Edit Task' : 'New Task'}
           </h2>
-          <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-600">
+          <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700">
             <X className="w-5 h-5" />
           </button>
         </div>

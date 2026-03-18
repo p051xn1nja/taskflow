@@ -84,7 +84,7 @@ export function Sidebar() {
         {/* Nav */}
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
           {!collapsed && (
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600 px-3 mb-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-800 px-3 mb-2">
               Workspace
             </p>
           )}
@@ -112,7 +112,7 @@ export function Sidebar() {
           {isAdmin && (
             <>
               {!collapsed && (
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-600 px-3 mb-2 mt-6">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-800 px-3 mb-2 mt-6">
                   Administration
                 </p>
               )}
@@ -154,7 +154,7 @@ export function Sidebar() {
                 <p className="text-sm font-medium text-surface-900 truncate">
                   {session?.user?.display_name || session?.user?.username}
                 </p>
-                <p className="text-xs text-surface-600 flex items-center gap-1">
+                <p className="text-xs text-surface-700 flex items-center gap-1">
                   {isAdmin && <Shield className="w-3 h-3 text-accent-purple" />}
                   {session?.user?.role}
                 </p>
@@ -163,7 +163,7 @@ export function Sidebar() {
             {!collapsed && (
               <button
                 onClick={() => signOut({ callbackUrl: '/login' })}
-                className="p-2 rounded-lg hover:bg-surface-300/30 text-surface-600 hover:text-accent-red transition-colors"
+                className="p-2 rounded-lg hover:bg-surface-300/30 text-surface-700 hover:text-accent-red transition-colors"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />

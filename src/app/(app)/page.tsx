@@ -156,7 +156,7 @@ export default function TasksPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{pagination.total}</p>
-              <p className="text-xs text-surface-600">Total</p>
+              <p className="text-xs text-surface-700">Total</p>
             </div>
           </div>
         </div>
@@ -167,7 +167,7 @@ export default function TasksPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{completedCount}</p>
-              <p className="text-xs text-surface-600">Completed</p>
+              <p className="text-xs text-surface-700">Completed</p>
             </div>
           </div>
         </div>
@@ -178,7 +178,7 @@ export default function TasksPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{inProgressCount}</p>
-              <p className="text-xs text-surface-600">In Progress</p>
+              <p className="text-xs text-surface-700">In Progress</p>
             </div>
           </div>
         </div>
@@ -189,7 +189,7 @@ export default function TasksPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-white">{avgProgress}%</p>
-              <p className="text-xs text-surface-600">Avg Progress</p>
+              <p className="text-xs text-surface-700">Avg Progress</p>
             </div>
           </div>
         </div>
@@ -199,7 +199,7 @@ export default function TasksPage() {
       <div className="card p-4 space-y-3">
         <div className="flex gap-3">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-surface-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <Search className="w-4 h-4 text-surface-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               className="input-base pl-10"
@@ -275,10 +275,10 @@ export default function TasksPage() {
       ) : tasks.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-16 h-16 rounded-2xl bg-surface-200/40 flex items-center justify-center mx-auto mb-4">
-            <CheckCircle2 className="w-8 h-8 text-surface-500" />
+            <CheckCircle2 className="w-8 h-8 text-surface-700" />
           </div>
           <h3 className="text-lg font-medium text-surface-800">No tasks found</h3>
-          <p className="text-surface-600 text-sm mt-1">Create your first task to get started</p>
+          <p className="text-surface-700 text-sm mt-1">Create your first task to get started</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -295,7 +295,7 @@ export default function TasksPage() {
                 )}
                 <Calendar className="w-3.5 h-3.5" />
                 {date}
-                <span className="text-surface-600 font-normal">({dateTasks.length})</span>
+                <span className="text-surface-700 font-normal">({dateTasks.length})</span>
               </button>
               {!collapsedGroups.has(date) && (
                 <div className="space-y-2 animate-fade-in">
@@ -326,7 +326,7 @@ export default function TasksPage() {
           >
             Previous
           </button>
-          <span className="text-sm text-surface-700 px-3">
+          <span className="text-sm text-surface-800 px-3">
             Page {pagination.page} of {pagination.total_pages}
           </span>
           <button
@@ -362,7 +362,7 @@ export default function TasksPage() {
           <div className="card w-full max-w-md p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-white">Upload Files</h2>
-              <button onClick={() => setUploadTaskId(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-600">
+              <button onClick={() => setUploadTaskId(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700">
                 <X className="w-5 h-5" />
               </button>
             </div>

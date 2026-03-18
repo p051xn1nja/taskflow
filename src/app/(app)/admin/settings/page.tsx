@@ -73,7 +73,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <label className="text-sm font-medium text-surface-800">Allow Registration</label>
-                <p className="text-xs text-surface-600">Let new users register themselves</p>
+                <p className="text-xs text-surface-700">Let new users register themselves</p>
               </div>
               <button
                 type="button"
@@ -87,6 +87,27 @@ export default function SettingsPage() {
               >
                 <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow ${
                   settings.allow_registration === 'true' ? 'translate-x-5' : ''
+                }`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <label className="text-sm font-medium text-surface-800">Require Admin Approval</label>
+                <p className="text-xs text-surface-700">New registrations must be approved by an admin before login</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSettings({
+                  ...settings,
+                  require_admin_approval: settings.require_admin_approval === 'true' ? 'false' : 'true'
+                })}
+                className={`relative w-11 h-6 rounded-full transition-colors ${
+                  settings.require_admin_approval === 'true' ? 'bg-accent-green' : 'bg-surface-400'
+                }`}
+              >
+                <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform shadow ${
+                  settings.require_admin_approval === 'true' ? 'translate-x-5' : ''
                 }`} />
               </button>
             </div>

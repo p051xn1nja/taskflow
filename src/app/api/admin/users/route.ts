@@ -10,7 +10,7 @@ export async function GET() {
 
   const db = getDb()
   const users = db.prepare(`
-    SELECT u.id, u.username, u.email, u.display_name, u.role, u.is_active, u.created_at, u.updated_at,
+    SELECT u.id, u.username, u.email, u.display_name, u.role, u.is_active, u.pending_approval, u.created_at, u.updated_at,
       COUNT(t.id) as task_count
     FROM users u
     LEFT JOIN tasks t ON u.id = t.user_id

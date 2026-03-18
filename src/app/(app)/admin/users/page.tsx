@@ -16,6 +16,7 @@ interface UserData {
   display_name: string
   role: 'admin' | 'user'
   is_active: number
+  pending_approval: number
   created_at: string
   task_count: number
 }
@@ -69,6 +70,15 @@ export default function UsersPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !user.is_active }),
+    })
+    fetchUsers()
+  }
+
+  const approveUser = async (user: UserData) => {
+    await fetch(`/api/admin/users/${user.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: true, pending_approval: false }),
     })
     fetchUsers()
   }
@@ -141,13 +151,17 @@ export default function UsersPage() {
                     )}>
                       {user.role}
                     </span>
-                    {!user.is_active && (
+                    {user.pending_approval ? (
+                      <span className="badge text-[10px] bg-accent-amber/15 text-accent-amber border border-accent-amber/20">
+                        Pending Approval
+                      </span>
+                    ) : !user.is_active && (
                       <span className="badge text-[10px] bg-accent-red/15 text-accent-red border border-accent-red/20">
                         Inactive
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-surface-600 mt-0.5">
+                  <div className="flex items-center gap-3 text-xs text-surface-800 mt-0.5">
                     <span>@{user.username}</span>
                     <span>{user.email}</span>
                     <span>{user.task_count} tasks</span>
@@ -155,13 +169,22 @@ export default function UsersPage() {
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {user.pending_approval && (
+                    <button
+                      onClick={() => approveUser(user)}
+                      className="p-1.5 rounded-lg hover:bg-accent-green/10 text-surface-700 hover:text-accent-green transition-colors"
+                      title="Approve"
+                    >
+                      <UserCheck className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     onClick={() => toggleActive(user)}
                     className={cn(
                       'p-1.5 rounded-lg transition-colors',
                       user.is_active
-                        ? 'hover:bg-accent-amber/10 text-surface-600 hover:text-accent-amber'
-                        : 'hover:bg-accent-green/10 text-surface-600 hover:text-accent-green'
+                        ? 'hover:bg-accent-amber/10 text-surface-700 hover:text-accent-amber'
+                        : 'hover:bg-accent-green/10 text-surface-700 hover:text-accent-green'
                     )}
                     title={user.is_active ? 'Deactivate' : 'Activate'}
                   >
@@ -169,7 +192,7 @@ export default function UsersPage() {
                   </button>
                   <button
                     onClick={() => startEdit(user)}
-                    className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-600 hover:text-brand-400 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
                     title="Edit"
                   >
                     <Pencil className="w-3.5 h-3.5" />
@@ -177,7 +200,7 @@ export default function UsersPage() {
                   {user.id !== session.user.id && (
                     <button
                       onClick={() => handleDelete(user.id)}
-                      className="p-1.5 rounded-lg hover:bg-accent-red/10 text-surface-600 hover:text-accent-red transition-colors"
+                      className="p-1.5 rounded-lg hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
                       title="Delete"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -198,7 +221,7 @@ export default function UsersPage() {
               <h2 className="text-lg font-semibold text-white">
                 {editing ? 'Edit User' : 'Create User'}
               </h2>
-              <button onClick={resetForm} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-600">
+              <button onClick={resetForm} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -239,7 +262,7 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-surface-800 mb-1.5">
-                  Password {editing && <span className="text-surface-600 font-normal">(leave blank to keep)</span>}
+                  Password {editing && <span className="text-surface-700 font-normal">(leave blank to keep)</span>}
                 </label>
                 <input
                   type="password"

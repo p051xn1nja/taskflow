@@ -91,10 +91,10 @@ export default function CategoriesPage() {
       ) : categories.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-16 h-16 rounded-2xl bg-surface-200/40 flex items-center justify-center mx-auto mb-4">
-            <Tag className="w-8 h-8 text-surface-500" />
+            <Tag className="w-8 h-8 text-surface-700" />
           </div>
           <h3 className="text-lg font-medium text-surface-800">No categories yet</h3>
-          <p className="text-surface-600 text-sm mt-1">Create categories to organize your tasks</p>
+          <p className="text-surface-700 text-sm mt-1">Create categories to organize your tasks</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -109,18 +109,18 @@ export default function CategoriesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-surface-950 truncate">{cat.name}</h3>
-                  <p className="text-xs text-surface-600">{cat.task_count || 0} tasks</p>
+                  <p className="text-xs text-surface-700">{cat.task_count || 0} tasks</p>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => startEdit(cat)}
-                    className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-600 hover:text-brand-400 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id)}
-                    className="p-1.5 rounded-lg hover:bg-accent-red/10 text-surface-600 hover:text-accent-red transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -139,7 +139,7 @@ export default function CategoriesPage() {
               <h2 className="text-lg font-semibold text-white">
                 {editing ? 'Edit Category' : 'New Category'}
               </h2>
-              <button onClick={resetForm} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-600">
+              <button onClick={resetForm} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700">
                 <X className="w-5 h-5" />
               </button>
             </div>

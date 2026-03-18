@@ -45,6 +45,11 @@ export default function LoginPage() {
         setLoading(false)
         return
       }
+      if (data.pending_approval) {
+        setError('Your account is pending admin approval. Please check back later.')
+        setLoading(false)
+        return
+      }
       // Auto-login after setup
       const signInResult = await signIn('credentials', {
         username: form.username,
@@ -95,7 +100,7 @@ export default function LoginPage() {
             <Zap className="w-8 h-8 text-brand-400" />
           </div>
           <h1 className="text-3xl font-bold text-white tracking-tight">TaskFlow</h1>
-          <p className="text-surface-700 mt-1">
+          <p className="text-surface-800 mt-1">
             {isSetup && !hasUsers
               ? 'Create your admin account to get started'
               : 'Sign in to your account'}
@@ -192,7 +197,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-surface-600 text-xs mt-6">
+        <p className="text-center text-surface-700 text-xs mt-6">
           TaskFlow v2.0 &mdash; Modern Task Management
         </p>
       </div>

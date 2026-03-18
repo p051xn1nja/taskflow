@@ -32,7 +32,7 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
           {/* Toggle expand */}
           <button
             onClick={() => setExpanded(!expanded)}
-            className="mt-0.5 p-1 rounded-lg hover:bg-surface-300/30 text-surface-600 transition-colors flex-shrink-0"
+            className="mt-0.5 p-1 rounded-lg hover:bg-surface-300/30 text-surface-700 transition-colors flex-shrink-0"
           >
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
@@ -77,7 +77,7 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
             </div>
 
             {/* Meta row */}
-            <div className="flex items-center gap-3 mt-1.5 text-xs text-surface-600 flex-wrap">
+            <div className="flex items-center gap-3 mt-1.5 text-xs text-surface-800 flex-wrap">
               <span>{formatDate(task.created_at)}</span>
               {task.due_date && (
                 <span className="flex items-center gap-1">
@@ -108,7 +108,7 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
                   style={{ width: `${task.progress}%` }}
                 />
               </div>
-              <span className="text-xs font-medium text-surface-700 w-8 text-right">{task.progress}%</span>
+              <span className="text-xs font-medium text-surface-800 w-8 text-right">{task.progress}%</span>
             </div>
           </div>
 
@@ -116,14 +116,14 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => onEdit(task)}
-              className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-600 hover:text-brand-400 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
               title="Edit"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onDelete(task.id)}
-              className="p-1.5 rounded-lg hover:bg-accent-red/10 text-surface-600 hover:text-accent-red transition-colors"
+              className="p-1.5 rounded-lg hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
               title="Delete"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -136,13 +136,20 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
           <div className="mt-4 ml-14 space-y-4 animate-slide-down">
             {/* Progress slider */}
             <div>
-              <label className="text-xs font-medium text-surface-700 mb-1 block">Progress</label>
+              <label className="text-xs font-medium text-surface-800 mb-1 block">Progress</label>
               <input
                 type="range"
                 min="0"
                 max="100"
                 value={task.progress}
-                onChange={e => onUpdate(task.id, { progress: parseInt(e.target.value) })}
+                onChange={e => {
+                  e.stopPropagation()
+                  onUpdate(task.id, { progress: parseInt(e.target.value) })
+                }}
+                onMouseDown={e => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
+                onPointerDown={e => e.stopPropagation()}
+                onTouchStart={e => e.stopPropagation()}
                 className="w-full accent-brand-500"
               />
             </div>
@@ -150,7 +157,7 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
             {/* Description */}
             {task.description && (
               <div>
-                <label className="text-xs font-medium text-surface-700 mb-1 block">Description</label>
+                <label className="text-xs font-medium text-surface-800 mb-1 block">Description</label>
                 <div className="text-sm text-surface-800 bg-surface-200/40 rounded-xl p-3 whitespace-pre-wrap">
                   {task.description}
                 </div>
@@ -160,7 +167,7 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
             {/* Tags */}
             {task.tags.length > 0 && (
               <div>
-                <label className="text-xs font-medium text-surface-700 mb-1.5 block">Tags</label>
+                <label className="text-xs font-medium text-surface-800 mb-1.5 block">Tags</label>
                 <div className="flex flex-wrap gap-1.5">
                   {task.tags.map(tag => (
                     <span key={tag} className="badge bg-brand-600/10 text-brand-400 border border-brand-500/20">
@@ -174,26 +181,26 @@ export function TaskCard({ task, onUpdate, onDelete, onDeleteAttachment, onEdit 
             {/* Attachments */}
             {task.attachments.length > 0 && (
               <div>
-                <label className="text-xs font-medium text-surface-700 mb-1.5 block">Attachments</label>
+                <label className="text-xs font-medium text-surface-800 mb-1.5 block">Attachments</label>
                 <div className="space-y-1.5">
                   {task.attachments.map(att => (
                     <div
                       key={att.id}
                       className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm"
                     >
-                      <FileText className="w-4 h-4 text-surface-600 flex-shrink-0" />
+                      <FileText className="w-4 h-4 text-surface-700 flex-shrink-0" />
                       <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
-                      <span className="text-xs text-surface-600">{formatFileSize(att.size)}</span>
+                      <span className="text-xs text-surface-700">{formatFileSize(att.size)}</span>
                       <a
                         href={`/api/uploads/${att.id}`}
-                        className="p-1 rounded hover:bg-surface-300/40 text-surface-600 hover:text-brand-400 transition-colors"
+                        className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
                         title="Download"
                       >
                         <Download className="w-3.5 h-3.5" />
                       </a>
                       <button
                         onClick={() => onDeleteAttachment(att.id)}
-                        className="p-1 rounded hover:bg-accent-red/10 text-surface-600 hover:text-accent-red transition-colors"
+                        className="p-1 rounded hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
                         title="Delete"
                       >
                         <X className="w-3.5 h-3.5" />

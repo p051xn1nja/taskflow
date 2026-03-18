@@ -47,11 +47,11 @@ export function FileUpload({ taskId, onUploaded }: FileUploadProps) {
         <div className="space-y-1">
           {files.map((f, i) => (
             <div key={i} className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm">
-              <FileText className="w-4 h-4 text-surface-600" />
+              <FileText className="w-4 h-4 text-surface-700" />
               <span className="flex-1 truncate text-surface-800">{f.name}</span>
-              <span className="text-xs text-surface-600">{formatFileSize(f.size)}</span>
+              <span className="text-xs text-surface-700">{formatFileSize(f.size)}</span>
               <button onClick={() => setFiles(files.filter((_, j) => j !== i))}>
-                <X className="w-3.5 h-3.5 text-surface-600 hover:text-accent-red" />
+                <X className="w-3.5 h-3.5 text-surface-700 hover:text-accent-red" />
               </button>
             </div>
           ))}

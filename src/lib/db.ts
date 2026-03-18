@@ -96,6 +96,13 @@ function initializeSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_attachments_task_id ON attachments(task_id);
   `)
 
+  // Migrations: add columns that may not exist yet
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[]
+  const columnNames = columns.map(c => c.name)
+  if (!columnNames.includes('pending_approval')) {
+    db.exec("ALTER TABLE users ADD COLUMN pending_approval INTEGER NOT NULL DEFAULT 0")
+  }
+
   // Insert default platform settings if not exist
   const insertSetting = db.prepare(
     'INSERT OR IGNORE INTO platform_settings (key, value) VALUES (?, ?)'
@@ -105,6 +112,7 @@ function initializeSchema(db: Database.Database) {
   insertSetting.run('max_file_size_mb', '25')
   insertSetting.run('allow_registration', 'false')
   insertSetting.run('max_categories_per_user', '50')
+  insertSetting.run('require_admin_approval', 'false')
 }
 
 export const UPLOADS_PATH = UPLOADS_DIR

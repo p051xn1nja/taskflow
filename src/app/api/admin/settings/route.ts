@@ -21,7 +21,7 @@ export async function PATCH(req: Request) {
   const db = getDb()
 
   const upsert = db.prepare('INSERT OR REPLACE INTO platform_settings (key, value) VALUES (?, ?)')
-  const allowedKeys = ['app_name', 'max_tasks_per_user', 'max_file_size_mb', 'allow_registration', 'max_categories_per_user']
+  const allowedKeys = ['app_name', 'max_tasks_per_user', 'max_file_size_mb', 'allow_registration', 'max_categories_per_user', 'require_admin_approval']
 
   for (const [key, value] of Object.entries(body)) {
     if (allowedKeys.includes(key)) {

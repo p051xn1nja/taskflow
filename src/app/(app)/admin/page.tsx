@@ -64,7 +64,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-white">{stats?.users || 0}</p>
-                  <p className="text-sm text-surface-600">Users</p>
+                  <p className="text-sm text-surface-700">Users</p>
                 </div>
               </div>
             </div>
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-white">{stats?.tasks || 0}</p>
-                  <p className="text-sm text-surface-600">Total Tasks</p>
+                  <p className="text-sm text-surface-700">Total Tasks</p>
                 </div>
               </div>
             </div>
@@ -86,7 +86,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-3xl font-bold text-white">Active</p>
-                  <p className="text-sm text-surface-600">Platform Status</p>
+                  <p className="text-sm text-surface-700">Platform Status</p>
                 </div>
               </div>
             </div>
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-white">User Management</h3>
-                  <p className="text-sm text-surface-600">Create, edit, and manage user accounts</p>
+                  <p className="text-sm text-surface-700">Create, edit, and manage user accounts</p>
                 </div>
               </div>
             </Link>
@@ -111,7 +111,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-white">Platform Settings</h3>
-                  <p className="text-sm text-surface-600">Configure platform-wide settings</p>
+                  <p className="text-sm text-surface-700">Configure platform-wide settings</p>
                 </div>
               </div>
             </Link>
