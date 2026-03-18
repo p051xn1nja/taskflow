@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   taskflow:
-    build: .
+    image: ghcr.io/p051xn1nja/taskflow:latest
     container_name: taskflow
     restart: unless-stopped
     working_dir: /app
