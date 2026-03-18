@@ -22,7 +22,7 @@ Modern task management platform built with Next.js 14, SQLite, and NextAuth.
 ```
 src/
 ├── app/              # Next.js App Router
-│   ├── (app)/        # Protected routes (tasks, categories, admin)
+│   ├── (app)/        # Protected routes (tasks, board, categories, admin)
 │   ├── login/        # Auth pages
 │   └── api/          # REST API endpoints
 ├── components/       # React components + UI library
@@ -51,6 +51,15 @@ SQLite runs in WAL mode with foreign keys enabled.
 - `NEXTAUTH_SECRET` — Session encryption key (required, change from default)
 - `NEXTAUTH_URL` — Public URL (`https://task.sidecloud.net`)
 - `NODE_ENV` — `production` in Docker
+
+## Views
+
+- **Tasks** (`/`): List view with filters, search, pagination
+- **Board** (`/board`): Kanban board with three columns (To Do, In Progress, Done)
+  - Columns derived from task `status` and `progress` fields — no extra schema
+  - To Do: `status='in_progress'` + `progress=0`; In Progress: `progress 1-99%`; Done: `status='completed'`
+  - HTML5 native drag-and-drop (zero dependencies) with optimistic UI updates
+  - Moving cards updates `status` and `progress` via `PATCH /api/tasks/:id`
 
 ## Key Conventions
 
