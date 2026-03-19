@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Plus, Pencil, Trash2, GripVertical, X, Loader2,
   CircleDot, Check, Shield,
@@ -23,6 +23,20 @@ export default function StatusesPage() {
   const [isCompleted, setIsCompleted] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+
+  const formRef = useRef<HTMLDivElement>(null)
+
+  // ESC to close + click outside to close
+  useEffect(() => {
+    if (!showForm) return
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') resetForm() }
+    const handleClick = (e: MouseEvent) => {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) resetForm()
+    }
+    window.addEventListener('keydown', handleKey)
+    document.addEventListener('mousedown', handleClick)
+    return () => { window.removeEventListener('keydown', handleKey); document.removeEventListener('mousedown', handleClick) }
+  }, [showForm])
 
   const fetchStatuses = async () => {
     setLoading(true)
@@ -186,7 +200,7 @@ export default function StatusesPage() {
       {/* Form modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-md p-6 animate-scale-in">
+          <div ref={formRef} className="card w-full max-w-md p-6 animate-scale-in">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-white">
                 {editing ? 'Edit Status' : 'New Status'}

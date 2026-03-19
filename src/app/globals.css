@@ -28,6 +28,11 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-surface-500;
   }
+
+  /* Date input calendar icon — make white */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
 }
 
 @layer components {

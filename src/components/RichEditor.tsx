@@ -13,7 +13,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import Highlight from '@tiptap/extension-highlight'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Bold, Italic, Underline as UnderlineIcon, Strikethrough, Code,
   Heading1, Heading2, Heading3, List, ListOrdered,
@@ -58,6 +58,56 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
     width: '100',
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const colorPickerRef = useRef<HTMLDivElement>(null)
+  const highlightPickerRef = useRef<HTMLDivElement>(null)
+  const linkInputRef = useRef<HTMLDivElement>(null)
+  const tableModalRef = useRef<HTMLDivElement>(null)
+  const tableAttrRef = useRef<HTMLDivElement>(null)
+
+  const closeAllMenus = useCallback(() => {
+    setShowColorPicker(false)
+    setShowHighlightPicker(false)
+    setShowLinkInput(false)
+    setShowTableModal(false)
+  }, [])
+
+  // ESC to close any open menu or table attr modal
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showTableAttrModal) { setShowTableAttrModal(false); return }
+        if (showColorPicker || showHighlightPicker || showLinkInput || showTableModal) {
+          closeAllMenus()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [showColorPicker, showHighlightPicker, showLinkInput, showTableModal, showTableAttrModal, closeAllMenus])
+
+  // Click outside to close toolbar dropdowns
+  useEffect(() => {
+    if (!showColorPicker && !showHighlightPicker && !showLinkInput && !showTableModal) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (showColorPicker && colorPickerRef.current && !colorPickerRef.current.contains(target)) setShowColorPicker(false)
+      if (showHighlightPicker && highlightPickerRef.current && !highlightPickerRef.current.contains(target)) setShowHighlightPicker(false)
+      if (showLinkInput && linkInputRef.current && !linkInputRef.current.contains(target)) setShowLinkInput(false)
+      if (showTableModal && tableModalRef.current && !tableModalRef.current.contains(target)) setShowTableModal(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showColorPicker, showHighlightPicker, showLinkInput, showTableModal])
+
+  // Click outside to close table attr modal
+  useEffect(() => {
+    if (!showTableAttrModal) return
+    const handler = (e: MouseEvent) => {
+      if (tableAttrRef.current && !tableAttrRef.current.contains(e.target as Node)) setShowTableAttrModal(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showTableAttrModal])
 
   const editor = useEditor({
     extensions: [
@@ -220,7 +270,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
           <Separator />
 
           {/* Text color */}
-          <div className="relative">
+          <div className="relative" ref={colorPickerRef}>
             <ToolbarButton onClick={() => { setShowColorPicker(!showColorPicker); setShowHighlightPicker(false) }} title="Text Color">
               <Palette className="w-3.5 h-3.5" />
             </ToolbarButton>
@@ -240,7 +290,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
           </div>
 
           {/* Highlight */}
-          <div className="relative">
+          <div className="relative" ref={highlightPickerRef}>
             <ToolbarButton onClick={() => { setShowHighlightPicker(!showHighlightPicker); setShowColorPicker(false) }} active={editor.isActive('highlight')} title="Highlight">
               <Highlighter className="w-3.5 h-3.5" />
             </ToolbarButton>
@@ -317,7 +367,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
           <Separator />
 
           {/* Link */}
-          <div className="relative">
+          <div className="relative" ref={linkInputRef}>
             <ToolbarButton
               onClick={() => {
                 if (editor.isActive('link')) {
@@ -369,7 +419,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
           <Separator />
 
           {/* Table */}
-          <div className="relative">
+          <div className="relative" ref={tableModalRef}>
             <ToolbarButton onClick={() => setShowTableModal(!showTableModal)} active={editor.isActive('table')} title="Insert Table">
               <TableIcon className="w-3.5 h-3.5" />
             </ToolbarButton>
@@ -431,7 +481,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
       {/* Table attributes modal */}
       {showTableAttrModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="card w-full max-w-sm p-5 animate-scale-in">
+          <div ref={tableAttrRef} className="card w-full max-w-sm p-5 animate-scale-in">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-white">Table Settings</h3>
               <button type="button" onClick={() => setShowTableAttrModal(false)} className="p-1 rounded hover:bg-surface-300/30 text-surface-700">

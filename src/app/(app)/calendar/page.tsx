@@ -65,6 +65,8 @@ export default function CalendarPage() {
   const [dayPopup, setDayPopup] = useState<{ date: string; x: number; y: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
 
+  const createMenuRef = useRef<HTMLDivElement>(null)
+
   // Close popup on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -75,6 +77,28 @@ export default function CalendarPage() {
     if (dayPopup) document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [dayPopup])
+
+  // Close create menu on outside click
+  useEffect(() => {
+    if (!showCreateMenu) return
+    const handler = (e: MouseEvent) => {
+      if (createMenuRef.current && !createMenuRef.current.contains(e.target as Node)) setShowCreateMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showCreateMenu])
+
+  // ESC to close popups
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (dayPopup) { setDayPopup(null); return }
+        if (showCreateMenu) { setShowCreateMenu(false); return }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [dayPopup, showCreateMenu])
 
   // Calculate date range for current view
   const dateRange = useMemo(() => {
@@ -609,7 +633,7 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-bold text-white">Calendar</h1>
           <p className="text-surface-700 text-sm mt-0.5">{items.length} item{items.length !== 1 ? 's' : ''} in view</p>
         </div>
-        <div className="relative">
+        <div className="relative" ref={createMenuRef}>
           <button onClick={() => setShowCreateMenu(!showCreateMenu)} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> Create
           </button>
