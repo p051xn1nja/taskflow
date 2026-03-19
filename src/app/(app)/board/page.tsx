@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import {
   Plus, Loader2, Calendar, Paperclip, Hash, GripVertical,
-  CircleDot, CheckCircle2, Pencil, Trash2,
+  CircleDot, CheckCircle2, Pencil, Trash2, X, Check, MoreVertical,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { TaskForm } from '@/components/TaskForm'
@@ -174,6 +174,46 @@ export default function BoardPage() {
 
   // Mobile touch drag state
   const [touchDragTask, setTouchDragTask] = useState<Task | null>(null)
+
+  // Column menu state
+  const [columnMenu, setColumnMenu] = useState<string | null>(null)
+  const [renamingColumn, setRenamingColumn] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const columnMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close column menu on outside click / ESC
+  useEffect(() => {
+    if (!columnMenu) return
+    const handleClick = (e: MouseEvent) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(e.target as Node)) setColumnMenu(null)
+    }
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setColumnMenu(null) }
+    document.addEventListener('mousedown', handleClick)
+    window.addEventListener('keydown', handleKey)
+    return () => { document.removeEventListener('mousedown', handleClick); window.removeEventListener('keydown', handleKey) }
+  }, [columnMenu])
+
+  const handleRenameColumn = async (statusId: string) => {
+    const trimmed = renameValue.trim()
+    if (!trimmed) return
+    await fetch(`/api/statuses/${statusId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    })
+    setRenamingColumn(null)
+    setRenameValue('')
+    fetchAll()
+  }
+
+  const handleDeleteColumn = async (statusId: string) => {
+    const s = statuses.find(st => st.id === statusId)
+    if (s?.is_default) { alert('Cannot delete the default status.'); return }
+    if (!confirm('Delete this status? Tasks will be moved to the default status.')) return
+    await fetch(`/api/statuses/${statusId}`, { method: 'DELETE' })
+    setColumnMenu(null)
+    fetchAll()
+  }
 
   const fetchAll = useCallback(async () => {
     const [tasksRes, statusesRes, categoriesRes] = await Promise.all([
@@ -386,7 +426,7 @@ export default function BoardPage() {
               <div
                 key={col.id}
                 className={cn(
-                  'flex flex-col rounded-2xl border min-w-[280px] w-[280px] flex-shrink-0 transition-all duration-200',
+                  'flex flex-col rounded-2xl border min-w-[280px] w-[280px] flex-shrink-0 transition-all duration-200 group/col',
                   isDragOver && 'ring-2 ring-brand-500/40 border-brand-500/30 bg-brand-600/10',
                 )}
                 style={{
@@ -397,13 +437,68 @@ export default function BoardPage() {
                 onDrop={e => handleDrop(e, col.id)}
               >
                 <div className="flex items-center gap-2.5 px-4 py-3.5 border-b" style={{ borderColor: col.color + '20' }}>
-                  <CircleDot className="w-4 h-4" style={{ color: col.color }} />
-                  <h3 className="text-sm font-semibold" style={{ color: col.color }}>{col.name}</h3>
-                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full" style={{
-                    backgroundColor: col.color + '20', color: col.color
-                  }}>
-                    {colTasks.length}
-                  </span>
+                  <CircleDot className="w-4 h-4 flex-shrink-0" style={{ color: col.color }} />
+                  {renamingColumn === col.id ? (
+                    <form
+                      className="flex items-center gap-1.5 flex-1 min-w-0"
+                      onSubmit={e => { e.preventDefault(); handleRenameColumn(col.id) }}
+                    >
+                      <input
+                        type="text"
+                        value={renameValue}
+                        onChange={e => setRenameValue(e.target.value)}
+                        className="input-base text-sm py-1 px-2 flex-1 min-w-0"
+                        autoFocus
+                        maxLength={40}
+                        onKeyDown={e => { if (e.key === 'Escape') { setRenamingColumn(null); setRenameValue('') } }}
+                      />
+                      <button type="submit" className="p-1 rounded-md hover:bg-accent-green/15 text-accent-green transition-colors">
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => { setRenamingColumn(null); setRenameValue('') }} className="p-1 rounded-md hover:bg-surface-300/40 text-surface-700 transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <h3 className="text-sm font-semibold flex-1 min-w-0 truncate" style={{ color: col.color }}>{col.name}</h3>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0" style={{
+                        backgroundColor: col.color + '20', color: col.color
+                      }}>
+                        {colTasks.length}
+                      </span>
+                      <div className="relative flex-shrink-0">
+                        <button
+                          onClick={e => { e.stopPropagation(); setColumnMenu(columnMenu === col.id ? null : col.id) }}
+                          className="p-1 rounded-md hover:bg-surface-300/40 text-surface-700 hover:text-surface-900 transition-colors opacity-0 group-hover/col:opacity-100"
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+                        {columnMenu === col.id && (
+                          <div ref={columnMenuRef} className="absolute right-0 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 overflow-hidden min-w-[140px]">
+                            <button
+                              onClick={() => {
+                                setRenameValue(col.name)
+                                setRenamingColumn(col.id)
+                                setColumnMenu(null)
+                              }}
+                              className="flex items-center gap-2 w-full px-3 py-2.5 text-sm hover:bg-surface-300/30 transition-colors text-surface-900"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-brand-400" /> Rename
+                            </button>
+                            {!col.is_default && (
+                              <button
+                                onClick={() => handleDeleteColumn(col.id)}
+                                className="flex items-center gap-2 w-full px-3 py-2.5 text-sm hover:bg-accent-red/10 transition-colors text-accent-red"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" /> Delete
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className="flex-1 p-2.5 space-y-2 overflow-y-auto">
                   {colTasks.map(task => (

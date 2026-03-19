@@ -6,6 +6,45 @@ import fs from 'fs'
 import path from 'path'
 import { UPLOADS_PATH } from '@/lib/db'
 
+export async function GET(_req: Request, { params }: { params: { id: string } }) {
+  const { error, session } = await requireAuth()
+  if (error) return error
+
+  const db = getDb()
+  const task = db.prepare(`
+    SELECT t.*, c.name as category_name, c.color as category_color,
+      s.name as status_name, s.color as status_color, s.is_completed as status_is_completed, s.is_default as status_is_default, s.position as status_position
+    FROM tasks t
+    LEFT JOIN categories c ON t.category_id = c.id
+    LEFT JOIN statuses s ON t.status_id = s.id
+    WHERE t.id = ? AND t.user_id = ?
+  `).get(params.id, session!.user.id) as Record<string, unknown> | undefined
+  if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const tags = db.prepare(`
+    SELECT tg.id, tg.name, tg.color
+    FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id
+    WHERE tt.task_id = ?
+  `).all(params.id)
+
+  const attachments = db.prepare('SELECT * FROM attachments WHERE task_id = ?').all(params.id)
+
+  return NextResponse.json({
+    ...task,
+    tags,
+    attachments,
+    category: task.category_id ? { id: task.category_id, name: task.category_name, color: task.category_color } : null,
+    task_status: task.status_id ? {
+      id: task.status_id,
+      name: task.status_name,
+      color: task.status_color,
+      is_completed: task.status_is_completed === 1,
+      is_default: task.status_is_default === 1,
+      position: task.status_position ?? 0,
+    } : null,
+  })
+}
+
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { error, session } = await requireAuth()
   if (error) return error

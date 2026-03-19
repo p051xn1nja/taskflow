@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, Filter, Search,
   CalendarDays, CalendarRange, Calendar as CalendarIcon, Grid3X3,
-  CheckSquare, FileText, Loader2, X,
+  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download,
 } from 'lucide-react'
-import { cn, formatDate } from '@/lib/utils'
-import type { Category, Status, Tag } from '@/types'
+import { cn, formatDate, formatFileSize } from '@/lib/utils'
+import type { Category, Status, Tag, Task } from '@/types'
 
 type ViewMode = 'day' | 'week' | 'month' | 'year'
 
@@ -61,6 +61,11 @@ export default function CalendarPage() {
   const [filterType, setFilterType] = useState('all')
   const [showCreateMenu, setShowCreateMenu] = useState(false)
 
+  // Task detail modal
+  const [taskDetail, setTaskDetail] = useState<Task | null>(null)
+  const [taskDetailLoading, setTaskDetailLoading] = useState(false)
+  const taskDetailRef = useRef<HTMLDivElement>(null)
+
   // Day click popup state
   const [dayPopup, setDayPopup] = useState<{ date: string; x: number; y: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
@@ -88,17 +93,28 @@ export default function CalendarPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [showCreateMenu])
 
+  // Close task detail on outside click
+  useEffect(() => {
+    if (!taskDetail) return
+    const handler = (e: MouseEvent) => {
+      if (taskDetailRef.current && !taskDetailRef.current.contains(e.target as Node)) setTaskDetail(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [taskDetail])
+
   // ESC to close popups
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (taskDetail) { setTaskDetail(null); return }
         if (dayPopup) { setDayPopup(null); return }
         if (showCreateMenu) { setShowCreateMenu(false); return }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [dayPopup, showCreateMenu])
+  }, [taskDetail, dayPopup, showCreateMenu])
 
   // Calculate date range for current view
   const dateRange = useMemo(() => {
@@ -205,8 +221,24 @@ export default function CalendarPage() {
 
   const goToday = () => setCurrentDate(new Date())
 
-  const handleItemClick = (item: CalendarItem) => {
-    if (item.type === 'note') router.push(`/notes/${item.id}`)
+  const handleItemClick = async (item: CalendarItem) => {
+    if (item.type === 'note') {
+      router.push(`/notes/${item.id}`)
+      return
+    }
+    // Fetch full task details and show in modal
+    setTaskDetailLoading(true)
+    setTaskDetail(null)
+    try {
+      const res = await fetch(`/api/tasks/${item.id}`)
+      if (res.ok) {
+        const task = await res.json()
+        setTaskDetail(task)
+      }
+    } catch {
+      // ignore
+    }
+    setTaskDetailLoading(false)
   }
 
   const handleCreateTaskForDate = (dateStr: string) => {
@@ -290,7 +322,7 @@ export default function CalendarPage() {
       const { isStart, isEnd, isMiddle } = barInfo
       return (
         <button
-          onClick={() => handleItemClick(item)}
+          onClick={(e) => { e.stopPropagation(); handleItemClick(item) }}
           className={cn(
             'flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium truncate w-full text-left transition-colors min-h-[20px]',
             item.is_completed && 'opacity-50',
@@ -317,7 +349,7 @@ export default function CalendarPage() {
     // Regular pill (single-day task or note)
     return (
       <button
-        onClick={() => handleItemClick(item)}
+        onClick={(e) => { e.stopPropagation(); handleItemClick(item) }}
         className={cn(
           'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium truncate w-full text-left transition-colors',
           item.type === 'note' ? 'hover:bg-accent-purple/15' : 'hover:bg-surface-300/30',
@@ -511,8 +543,8 @@ export default function CalendarPage() {
               {taskItems.map(item => {
                 const barInfo = getBarInfo(item, ds)
                 return (
-                  <div key={item.id} className={cn(
-                    'flex items-center gap-3 p-3 rounded-xl bg-surface-200/40 transition-colors hover:bg-surface-200/70',
+                  <button key={item.id} onClick={() => handleItemClick(item)} className={cn(
+                    'flex items-center gap-3 p-3 rounded-xl bg-surface-200/40 transition-colors hover:bg-surface-200/70 w-full text-left',
                     item.is_completed && 'opacity-50',
                     barInfo && 'border-l-3',
                   )}
@@ -534,7 +566,7 @@ export default function CalendarPage() {
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -721,6 +753,146 @@ export default function CalendarPage() {
           {view === 'day' && renderDay()}
           {view === 'year' && renderYear()}
         </>
+      )}
+
+      {/* Task detail modal */}
+      {(taskDetail || taskDetailLoading) && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          {taskDetailLoading ? (
+            <div className="card p-8 animate-scale-in">
+              <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
+            </div>
+          ) : taskDetail && (
+            <div ref={taskDetailRef} className="card w-full max-w-lg p-6 animate-scale-in max-h-[85vh] overflow-y-auto">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className={cn(
+                    'text-lg font-semibold text-white',
+                    (taskDetail.task_status?.is_completed ?? taskDetail.status === 'completed') && 'line-through text-surface-700',
+                  )}>
+                    {taskDetail.title}
+                  </h2>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {taskDetail.category && (
+                      <span className="badge text-[10px]" style={{
+                        backgroundColor: taskDetail.category.color + '20',
+                        color: taskDetail.category.color,
+                        border: `1px solid ${taskDetail.category.color}30`,
+                      }}>
+                        {taskDetail.category.name}
+                      </span>
+                    )}
+                    {taskDetail.task_status && (
+                      <span className="badge text-[10px] gap-0.5" style={{
+                        backgroundColor: taskDetail.task_status.color + '15',
+                        color: taskDetail.task_status.color,
+                        border: `1px solid ${taskDetail.task_status.color}25`,
+                      }}>
+                        {taskDetail.task_status.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => setTaskDetail(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 flex-shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Progress */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-1.5 bg-surface-300/40 rounded-full overflow-hidden">
+                  <div className={cn(
+                    'h-full rounded-full transition-all',
+                    taskDetail.progress >= 100 ? 'bg-accent-green' :
+                    taskDetail.progress >= 50 ? 'bg-brand-500' : 'bg-accent-amber'
+                  )} style={{ width: `${taskDetail.progress}%` }} />
+                </div>
+                <span className="text-xs font-medium text-surface-800 w-8 text-right tabular-nums">{taskDetail.progress}%</span>
+              </div>
+
+              {/* Description */}
+              {taskDetail.description && (
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-surface-800 mb-1 block">Description</label>
+                  <div className="text-sm text-surface-800 bg-surface-200/40 rounded-xl p-3 whitespace-pre-wrap">
+                    {taskDetail.description}
+                  </div>
+                </div>
+              )}
+
+              {/* Dates */}
+              {(taskDetail.start_date || taskDetail.due_date) && (
+                <div className="flex items-center gap-4 mb-4 text-xs text-surface-800">
+                  {taskDetail.start_date && (
+                    <span className="flex items-center gap-1.5">
+                      <CalendarIcon className="w-3.5 h-3.5 text-surface-700" />
+                      Start: {formatDate(taskDetail.start_date)}
+                    </span>
+                  )}
+                  {taskDetail.due_date && (
+                    <span className={cn('flex items-center gap-1.5',
+                      taskDetail.due_date && new Date(taskDetail.due_date) < new Date() && !(taskDetail.task_status?.is_completed) && 'text-accent-red'
+                    )}>
+                      <CalendarIcon className="w-3.5 h-3.5" />
+                      Due: {formatDate(taskDetail.due_date)}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Tags */}
+              {taskDetail.tags.length > 0 && (
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-surface-800 mb-1.5 block">Tags</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {taskDetail.tags.map(tag => (
+                      <span key={tag.id} className="badge gap-1" style={{
+                        backgroundColor: tag.color + '18',
+                        color: tag.color,
+                        border: `1px solid ${tag.color}25`,
+                      }}>
+                        <Hash className="w-3 h-3" />
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {taskDetail.attachments.length > 0 && (
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-surface-800 mb-1.5 block">
+                    <Paperclip className="w-3 h-3 inline mr-1" />
+                    Attachments ({taskDetail.attachments.length})
+                  </label>
+                  <div className="space-y-1.5">
+                    {taskDetail.attachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm">
+                        <FileText className="w-4 h-4 text-surface-700 flex-shrink-0" />
+                        <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
+                        <span className="text-xs text-surface-700">{formatFileSize(att.size)}</span>
+                        <a href={`/api/uploads/${att.id}`}
+                          className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                          title="Download">
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meta */}
+              <div className="text-[11px] text-surface-700 pt-2 border-t border-surface-300/20">
+                Created {formatDate(taskDetail.created_at)}
+                {taskDetail.updated_at && taskDetail.updated_at !== taskDetail.created_at && (
+                  <span> &middot; Updated {formatDate(taskDetail.updated_at)}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Day click popup */}
