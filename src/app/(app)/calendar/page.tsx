@@ -644,9 +644,11 @@ export default function CalendarPage() {
                 ))}
                 {weeks.flat().map((date, idx) => {
                   const ds = toDateStr(date)
-                  const hasItems = !!itemsByDate[ds]?.length
+                  const dayItems = itemsByDate[ds] || []
+                  const hasItems = dayItems.length > 0
                   const isThisMonth = date.getMonth() === m
                   const isToday2 = isSameDay(date, today)
+                  const dotColor = hasItems ? dayItems[0].color : undefined
                   return (
                     <div key={idx} className={cn(
                       'w-full aspect-square flex items-center justify-center relative',
@@ -659,7 +661,7 @@ export default function CalendarPage() {
                         {date.getDate()}
                       </span>
                       {hasItems && isThisMonth && (
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-400" />
+                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full" style={{ backgroundColor: dotColor }} />
                       )}
                     </div>
                   )
