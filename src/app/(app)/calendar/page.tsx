@@ -66,6 +66,9 @@ export default function CalendarPage() {
   const [taskDetailLoading, setTaskDetailLoading] = useState(false)
   const taskDetailRef = useRef<HTMLDivElement>(null)
 
+  // Abort controller for stale fetch cancellation
+  const abortRef = useRef<AbortController | null>(null)
+
   // Day click popup state
   const [dayPopup, setDayPopup] = useState<{ date: string; x: number; y: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
@@ -143,6 +146,11 @@ export default function CalendarPage() {
   }, [currentDate, view])
 
   const fetchItems = useCallback(async () => {
+    // Cancel any in-flight request so stale responses don't overwrite fresh data
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setLoading(true)
     const params = new URLSearchParams({
       date_from: dateRange.from,
@@ -153,10 +161,20 @@ export default function CalendarPage() {
     if (filterTag) params.set('tag', filterTag)
     if (filterType !== 'all') params.set('types', filterType)
 
-    const res = await fetch(`/api/calendar?${params}`)
-    const data = await res.json()
-    setItems(data.items || [])
-    setLoading(false)
+    try {
+      const res = await fetch(`/api/calendar?${params}`, { signal: controller.signal })
+      const data = await res.json()
+      if (!controller.signal.aborted) {
+        setItems(data.items || [])
+        setLoading(false)
+      }
+    } catch (e: unknown) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      if (!controller.signal.aborted) {
+        setItems([])
+        setLoading(false)
+      }
+    }
   }, [dateRange, filterCategory, filterStatus, filterTag, filterType])
 
   useEffect(() => { fetchItems() }, [fetchItems])
