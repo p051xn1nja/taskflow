@@ -239,7 +239,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
 - Note-task linking allows associating notes with related tasks (many-to-many)
 - Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views
-- Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; logout icon visible when collapsed
+- Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
 - Tasks have `start_date` and `due_date` fields; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing
