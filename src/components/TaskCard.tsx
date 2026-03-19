@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   ChevronDown, ChevronRight, Pencil, Trash2, Check,
-  Paperclip, Tag, Calendar, Download, FileText, Hash,
+  Paperclip, Calendar, Download, FileText, Hash,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import type { Task } from '@/types'
@@ -171,29 +171,6 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
                 <label className="text-xs font-medium text-surface-800 mb-1 block">Description</label>
                 <div className="text-sm text-surface-800 bg-surface-200/40 rounded-xl p-3 whitespace-pre-wrap">
                   {task.description}
-                </div>
-              </div>
-            )}
-
-            {/* Tags */}
-            {task.tags.length > 0 && (
-              <div>
-                <label className="text-xs font-medium text-surface-800 mb-1.5 block">Tags</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {task.tags.map(tag => (
-                    <span
-                      key={tag.id}
-                      className="badge gap-1"
-                      style={{
-                        backgroundColor: tag.color + '18',
-                        color: tag.color,
-                        border: `1px solid ${tag.color}25`,
-                      }}
-                    >
-                      <Hash className="w-3 h-3" />
-                      {tag.name}
-                    </span>
-                  ))}
                 </div>
               </div>
             )}

@@ -31,12 +31,13 @@ export async function GET(req: Request) {
     // Tasks with only due_date: shown on due_date (legacy)
     // Tasks with start_date and due_date: shown as a range
     // Tasks with only start_date: shown on start_date
-    let taskWhere = `WHERE t.user_id = ? AND (t.due_date IS NOT NULL OR t.start_date IS NOT NULL) AND (
+    let taskWhere = `WHERE t.user_id = ? AND (
       (t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(t.start_date) <= ? AND date(t.due_date) >= ?) OR
       (t.start_date IS NULL AND t.due_date IS NOT NULL AND date(t.due_date) >= ? AND date(t.due_date) <= ?) OR
-      (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) >= ? AND date(t.start_date) <= ?)
+      (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) >= ? AND date(t.start_date) <= ?) OR
+      (t.start_date IS NULL AND t.due_date IS NULL AND date(t.created_at) >= ? AND date(t.created_at) <= ?)
     )`
-    const taskParams: (string | number)[] = [userId, dateTo, dateFrom, dateFrom, dateTo, dateFrom, dateTo]
+    const taskParams: (string | number)[] = [userId, dateTo, dateFrom, dateFrom, dateTo, dateFrom, dateTo, dateFrom, dateTo]
 
     if (categoryId) {
       taskWhere += ' AND t.category_id = ?'
@@ -52,23 +53,23 @@ export async function GET(req: Request) {
     }
 
     const tasks = db.prepare(`
-      SELECT t.id, t.title, t.start_date, t.due_date, t.progress,
+      SELECT t.id, t.title, t.start_date, t.due_date, t.progress, t.created_at,
         s.name as status_name, s.color as status_color, s.is_completed,
         c.name as category_name, c.color as category_color
       FROM tasks t
       LEFT JOIN statuses s ON t.status_id = s.id
       LEFT JOIN categories c ON t.category_id = c.id
       ${taskWhere}
-      ORDER BY COALESCE(t.start_date, t.due_date)
+      ORDER BY COALESCE(t.start_date, t.due_date, t.created_at)
     `).all(...taskParams) as {
-      id: string; title: string; start_date: string | null; due_date: string | null; progress: number
+      id: string; title: string; start_date: string | null; due_date: string | null; progress: number; created_at: string
       status_name: string | null; status_color: string | null; is_completed: number | null
       category_name: string | null; category_color: string | null
     }[]
 
     for (const t of tasks) {
       items.push({
-        date: t.start_date || t.due_date || '',
+        date: t.start_date || t.due_date || t.created_at.split(/[T ]/)[0],
         type: 'task',
         id: t.id,
         title: t.title,
