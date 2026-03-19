@@ -43,7 +43,7 @@ interface TaskFormProps {
     start_date: string | null
     due_date: string | null
     progress?: number
-  }) => void
+  }) => Promise<string | void> | void
   onCancel: () => void
   onDeleteAttachment?: (attachmentId: string) => void
   onFilesUploaded?: () => void
@@ -179,7 +179,7 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
 
     setUploading(true)
 
-    // Upload staged files first (if editing and there are files)
+    // For existing tasks, upload staged files before submitting
     if (isEditing && stagedFiles.length > 0) {
       const formData = new FormData()
       formData.append('task_id', task!.id)
@@ -193,8 +193,8 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
       }
     }
 
-    // Submit task data
-    onSubmit({
+    // Submit task data (returns new task ID for create)
+    const result = await onSubmit({
       title: title.trim(),
       description: description.trim(),
       category_id: categoryId || null,
@@ -203,6 +203,20 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
       due_date: dueDate || null,
       ...(isEditing ? { progress } : {}),
     })
+
+    // For new tasks, upload files after creation using the returned task ID
+    if (!isEditing && stagedFiles.length > 0 && result) {
+      const formData = new FormData()
+      formData.append('task_id', result)
+      stagedFiles.forEach(f => formData.append('files', f))
+      const res = await fetch('/api/uploads', { method: 'POST', body: formData })
+      if (!res.ok) {
+        const data = await res.json()
+        setFileError(data.error || 'Upload failed')
+        setUploading(false)
+        return
+      }
+    }
 
     if (stagedFiles.length > 0 && onFilesUploaded) {
       onFilesUploaded()
@@ -407,120 +421,118 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
             </div>
           </div>
 
-          {/* Attachments (edit mode only) */}
-          {isEditing && (
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-medium text-surface-800">
-                  Attachments ({totalCount}/{MAX_FILES})
-                </label>
-                <span className="text-xs text-surface-700 tabular-nums">
-                  {formatFileSize(totalSize)} / 50 MB
-                </span>
-              </div>
-
-              {/* Existing attachments */}
-              {(attachments.length > 0 || stagedFiles.length > 0) && (
-                <div className="space-y-1.5 mb-3">
-                  {attachments.map(att => (
-                    <div
-                      key={att.id}
-                      className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm group/att"
-                    >
-                      {getFileIcon(att.original_name)}
-                      <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
-                      <span className="text-xs text-surface-700 tabular-nums">{formatFileSize(att.size)}</span>
-                      <a
-                        href={`/api/uploads/${att.id}`}
-                        className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
-                        title="Download"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAttachment(att.id)}
-                        className="p-1 rounded hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
-                        title="Remove"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Staged (new) files */}
-                  {stagedFiles.map((f, i) => (
-                    <div
-                      key={`staged-${i}`}
-                      className="flex items-center gap-2 bg-brand-600/8 border border-brand-500/15 rounded-lg p-2 text-sm"
-                    >
-                      {getFileIcon(f.name)}
-                      <span className="flex-1 truncate text-surface-800">{f.name}</span>
-                      <span className="text-[10px] font-medium text-brand-400 bg-brand-600/15 px-1.5 py-0.5 rounded">NEW</span>
-                      <span className="text-xs text-surface-700 tabular-nums">{formatFileSize(f.size)}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeStagedFile(i)}
-                        className="p-1 rounded hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
-                        title="Remove"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Drop zone */}
-              {totalCount < MAX_FILES && (
-                <>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    className="hidden"
-                    accept={acceptStr}
-                    onChange={e => {
-                      const files = Array.from(e.target.files || [])
-                      if (files.length > 0) validateAndAddFiles(files)
-                      e.target.value = ''
-                    }}
-                  />
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    className={cn(
-                      'border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all duration-150',
-                      dragOver
-                        ? 'border-brand-400 bg-brand-600/10'
-                        : 'border-surface-400/30 hover:border-surface-500/50 hover:bg-surface-200/30'
-                    )}
-                  >
-                    <Upload className={cn(
-                      'w-5 h-5 mx-auto mb-1.5 transition-colors',
-                      dragOver ? 'text-brand-400' : 'text-surface-700'
-                    )} />
-                    <p className="text-xs text-surface-800">
-                      Drop files here or <span className="text-brand-400 font-medium">browse</span>
-                    </p>
-                    <p className="text-[10px] text-surface-700 mt-1">
-                      Documents, images, archives &middot; 50 MB total
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {/* Error */}
-              {fileError && (
-                <div className="flex items-center gap-2 mt-2 text-xs text-accent-red">
-                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                  {fileError}
-                </div>
-              )}
+          {/* Attachments */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-sm font-medium text-surface-800">
+                Attachments ({totalCount}/{MAX_FILES})
+              </label>
+              <span className="text-xs text-surface-700 tabular-nums">
+                {formatFileSize(totalSize)} / 50 MB
+              </span>
             </div>
-          )}
+
+            {/* Existing attachments */}
+            {(attachments.length > 0 || stagedFiles.length > 0) && (
+              <div className="space-y-1.5 mb-3">
+                {attachments.map(att => (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm group/att"
+                  >
+                    {getFileIcon(att.original_name)}
+                    <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
+                    <span className="text-xs text-surface-700 tabular-nums">{formatFileSize(att.size)}</span>
+                    <a
+                      href={`/api/uploads/${att.id}`}
+                      className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                      title="Download"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteAttachment(att.id)}
+                      className="p-1 rounded hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
+                      title="Remove"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Staged (new) files */}
+                {stagedFiles.map((f, i) => (
+                  <div
+                    key={`staged-${i}`}
+                    className="flex items-center gap-2 bg-brand-600/8 border border-brand-500/15 rounded-lg p-2 text-sm"
+                  >
+                    {getFileIcon(f.name)}
+                    <span className="flex-1 truncate text-surface-800">{f.name}</span>
+                    <span className="text-[10px] font-medium text-brand-400 bg-brand-600/15 px-1.5 py-0.5 rounded">NEW</span>
+                    <span className="text-xs text-surface-700 tabular-nums">{formatFileSize(f.size)}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeStagedFile(i)}
+                      className="p-1 rounded hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors"
+                      title="Remove"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Drop zone */}
+            {totalCount < MAX_FILES && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept={acceptStr}
+                  onChange={e => {
+                    const files = Array.from(e.target.files || [])
+                    if (files.length > 0) validateAndAddFiles(files)
+                    e.target.value = ''
+                  }}
+                />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={cn(
+                    'border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all duration-150',
+                    dragOver
+                      ? 'border-brand-400 bg-brand-600/10'
+                      : 'border-surface-400/30 hover:border-surface-500/50 hover:bg-surface-200/30'
+                  )}
+                >
+                  <Upload className={cn(
+                    'w-5 h-5 mx-auto mb-1.5 transition-colors',
+                    dragOver ? 'text-brand-400' : 'text-surface-700'
+                  )} />
+                  <p className="text-xs text-surface-800">
+                    Drop files here or <span className="text-brand-400 font-medium">browse</span>
+                  </p>
+                  <p className="text-[10px] text-surface-700 mt-1">
+                    Documents, images, archives &middot; 50 MB total
+                  </p>
+                </div>
+              </>
+            )}
+
+            {/* Error */}
+            {fileError && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-accent-red">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                {fileError}
+              </div>
+            )}
+          </div>
 
           {/* Actions */}
           <div className="flex gap-3 pt-2">

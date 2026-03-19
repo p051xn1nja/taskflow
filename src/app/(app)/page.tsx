@@ -98,13 +98,15 @@ function TasksPageInner() {
   }, [fetchTasks])
 
   const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null }) => {
-    await fetch('/api/tasks', {
+    const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
+    const { id } = await res.json()
     setShowForm(false)
     fetchTasks(pagination.page)
+    return id as string
   }
 
   const handleUpdateTask = async (id: string, data: Partial<Task>) => {
@@ -376,6 +378,7 @@ function TasksPageInner() {
           defaultDueDate={defaultDueDate}
           onSubmit={handleCreateTask}
           onCancel={() => { setShowForm(false); setDefaultStartDate(''); setDefaultDueDate('') }}
+          onFilesUploaded={() => fetchTasks(pagination.page)}
         />
       )}
       {editingTask && (

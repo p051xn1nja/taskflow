@@ -250,13 +250,15 @@ export default function BoardPage() {
   }
 
   const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null }) => {
-    await fetch('/api/tasks', {
+    const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     })
+    const { id } = await res.json()
     setShowForm(false)
     fetchAll()
+    return id as string
   }
 
   const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; progress?: number }) => {
@@ -588,7 +590,7 @@ export default function BoardPage() {
       )}
 
       {showForm && (
-        <TaskForm categories={categories} onSubmit={handleCreateTask} onCancel={() => setShowForm(false)} />
+        <TaskForm categories={categories} onSubmit={handleCreateTask} onCancel={() => setShowForm(false)} onFilesUploaded={() => fetchAll()} />
       )}
       {editingTask && (
         <TaskForm task={editingTask} categories={categories} onSubmit={handleEditSubmit}
