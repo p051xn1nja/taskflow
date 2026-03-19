@@ -103,7 +103,7 @@ export async function GET(req: Request) {
 
     for (const n of notes) {
       items.push({
-        date: n.created_at.split('T')[0] || n.created_at.split(' ')[0],
+        date: n.created_at.split(/[T ]/)[0],
         type: 'note',
         id: n.id,
         title: n.title,

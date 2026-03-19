@@ -189,7 +189,7 @@ export default function CalendarPage() {
           cur.setDate(cur.getDate() + 1)
         }
       } else {
-        const d = item.date.split('T')[0] || item.date.split(' ')[0]
+        const d = item.date.split(/[T ]/)[0]
         if (!map[d]) map[d] = []
         map[d].push(item)
       }
