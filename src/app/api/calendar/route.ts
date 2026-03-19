@@ -23,12 +23,20 @@ export async function GET(req: Request) {
 
   ensureDefaultStatuses(db, userId)
 
-  const items: { date: string; type: 'task' | 'note'; id: string; title: string; color: string; status_name?: string; is_completed?: boolean; progress?: number; category_name?: string; category_color?: string }[] = []
+  const items: { date: string; type: 'task' | 'note'; id: string; title: string; color: string; status_name?: string; is_completed?: boolean; progress?: number; category_name?: string; category_color?: string; start_date?: string; end_date?: string }[] = []
 
-  // Fetch tasks by due_date
+  // Fetch tasks that overlap the date range (have start_date or due_date)
   if (types === 'all' || types === 'tasks') {
-    let taskWhere = 'WHERE t.user_id = ? AND t.due_date IS NOT NULL AND date(t.due_date) >= ? AND date(t.due_date) <= ?'
-    const taskParams: (string | number)[] = [userId, dateFrom, dateTo]
+    // A task is visible if its date range overlaps the query range
+    // Tasks with only due_date: shown on due_date (legacy)
+    // Tasks with start_date and due_date: shown as a range
+    // Tasks with only start_date: shown on start_date
+    let taskWhere = `WHERE t.user_id = ? AND (t.due_date IS NOT NULL OR t.start_date IS NOT NULL) AND (
+      (t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(t.start_date) <= ? AND date(t.due_date) >= ?) OR
+      (t.start_date IS NULL AND t.due_date IS NOT NULL AND date(t.due_date) >= ? AND date(t.due_date) <= ?) OR
+      (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) >= ? AND date(t.start_date) <= ?)
+    )`
+    const taskParams: (string | number)[] = [userId, dateTo, dateFrom, dateFrom, dateTo, dateFrom, dateTo]
 
     if (categoryId) {
       taskWhere += ' AND t.category_id = ?'
@@ -44,23 +52,23 @@ export async function GET(req: Request) {
     }
 
     const tasks = db.prepare(`
-      SELECT t.id, t.title, t.due_date, t.progress,
+      SELECT t.id, t.title, t.start_date, t.due_date, t.progress,
         s.name as status_name, s.color as status_color, s.is_completed,
         c.name as category_name, c.color as category_color
       FROM tasks t
       LEFT JOIN statuses s ON t.status_id = s.id
       LEFT JOIN categories c ON t.category_id = c.id
       ${taskWhere}
-      ORDER BY t.due_date
+      ORDER BY COALESCE(t.start_date, t.due_date)
     `).all(...taskParams) as {
-      id: string; title: string; due_date: string; progress: number
+      id: string; title: string; start_date: string | null; due_date: string | null; progress: number
       status_name: string | null; status_color: string | null; is_completed: number | null
       category_name: string | null; category_color: string | null
     }[]
 
     for (const t of tasks) {
       items.push({
-        date: t.due_date,
+        date: t.start_date || t.due_date || '',
         type: 'task',
         id: t.id,
         title: t.title,
@@ -70,6 +78,8 @@ export async function GET(req: Request) {
         progress: t.progress,
         category_name: t.category_name || undefined,
         category_color: t.category_color || undefined,
+        start_date: t.start_date || undefined,
+        end_date: t.due_date || undefined,
       })
     }
   }

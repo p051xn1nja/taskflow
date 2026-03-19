@@ -205,10 +205,10 @@ export default function StatusesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-surface-800 mb-1.5">Color</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-6 gap-3">
                   {PRESET_COLORS.map(c => (
                     <button key={c} type="button" onClick={() => setColor(c)}
-                      className={cn('w-8 h-8 rounded-lg transition-all', color === c ? 'ring-2 ring-white scale-110' : 'hover:scale-105')}
+                      className={cn('w-10 h-10 rounded-xl transition-all', color === c ? 'ring-2 ring-white ring-offset-2 ring-offset-surface-100 scale-110' : 'hover:scale-110')}
                       style={{ backgroundColor: c }} />
                   ))}
                 </div>

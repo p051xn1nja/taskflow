@@ -110,6 +110,11 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
             {/* Meta row */}
             <div className="flex items-center gap-3 mt-1.5 text-xs text-surface-800 flex-wrap">
               <span>{formatDate(task.created_at)}</span>
+              {task.start_date && (
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3 h-3" /> Start {formatDate(task.start_date)}
+                </span>
+              )}
               {task.due_date && (
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" /> Due {formatDate(task.due_date)}

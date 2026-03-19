@@ -53,6 +53,7 @@ export function createTestDb(): Database.Database {
       status TEXT NOT NULL DEFAULT 'in_progress' CHECK(status IN ('in_progress', 'completed')),
       status_id TEXT,
       progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
+      start_date TEXT,
       due_date TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -185,12 +186,12 @@ export function seedCategory(db: Database.Database, userId: string, overrides: P
 /** Insert a test task and return its ID. */
 export function seedTask(db: Database.Database, userId: string, overrides: Partial<{
   id: string; title: string; description: string; category_id: string | null
-  status: string; progress: number; due_date: string | null; status_id: string | null
+  status: string; progress: number; start_date: string | null; due_date: string | null; status_id: string | null
 }> = {}): string {
   const id = overrides.id ?? 'task-test-001'
   db.prepare(`
-    INSERT INTO tasks (id, user_id, title, description, category_id, status, progress, due_date, status_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO tasks (id, user_id, title, description, category_id, status, progress, start_date, due_date, status_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     userId,
@@ -199,6 +200,7 @@ export function seedTask(db: Database.Database, userId: string, overrides: Parti
     overrides.category_id ?? null,
     overrides.status ?? 'in_progress',
     overrides.progress ?? 0,
+    overrides.start_date ?? null,
     overrides.due_date ?? null,
     overrides.status_id ?? null,
   )

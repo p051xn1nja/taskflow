@@ -25,6 +25,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     status: 'status',
     status_id: 'status_id',
     progress: 'progress',
+    start_date: 'start_date',
     due_date: 'due_date',
   }
 

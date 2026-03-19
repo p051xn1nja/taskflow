@@ -15,29 +15,62 @@ function KanbanCard({
   onEdit,
   onDelete,
   onDragStart,
+  onTouchDragStart,
 }: {
   task: Task
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
   onDragStart: (e: React.DragEvent, task: Task) => void
+  onTouchDragStart: (task: Task) => void
 }) {
   const isDone = task.task_status?.is_completed ?? task.status === 'completed'
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !isDone
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const hasMoved = useRef(false)
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    hasMoved.current = false
+    touchTimerRef.current = setTimeout(() => {
+      if (!hasMoved.current) {
+        onTouchDragStart(task)
+        // Vibrate if available
+        if (navigator.vibrate) navigator.vibrate(50)
+      }
+    }, 300)
+  }
+
+  const handleTouchMove = () => {
+    hasMoved.current = true
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current)
+      touchTimerRef.current = null
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current)
+      touchTimerRef.current = null
+    }
+  }
 
   return (
     <div
       draggable
       onDragStart={e => onDragStart(e, task)}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       className={cn(
         'group relative rounded-xl border bg-surface-100/80 backdrop-blur-sm p-3.5',
         'cursor-grab active:cursor-grabbing',
         'hover:border-surface-500/40 hover:shadow-lg hover:shadow-black/10',
-        'transition-all duration-150',
+        'transition-all duration-150 touch-manipulation',
         'border-surface-300/25',
         isDone && 'opacity-60',
       )}
     >
-      <div className="absolute top-3 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute top-3 right-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
         <GripVertical className="w-4 h-4 text-surface-700" />
       </div>
 
@@ -95,6 +128,11 @@ function KanbanCard({
       )}
 
       <div className="flex items-center gap-2 mt-3 flex-wrap">
+        {task.start_date && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-surface-300/30 text-surface-800">
+            <Calendar className="w-3 h-3" />{formatDate(task.start_date)}
+          </span>
+        )}
         {task.due_date && (
           <span className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md',
             isOverdue ? 'bg-accent-red/12 text-accent-red' : 'bg-surface-300/30 text-surface-800'
@@ -108,14 +146,14 @@ function KanbanCard({
           </span>
         )}
         <div className="flex-1" />
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-0.5 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
           <button onClick={e => { e.stopPropagation(); onEdit(task) }}
-            className="p-1 rounded-md hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors" title="Edit">
-            <Pencil className="w-3 h-3" />
+            className="p-1.5 rounded-md hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors" title="Edit">
+            <Pencil className="w-3.5 h-3.5" />
           </button>
           <button onClick={e => { e.stopPropagation(); onDelete(task.id) }}
-            className="p-1 rounded-md hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors" title="Delete">
-            <Trash2 className="w-3 h-3" />
+            className="p-1.5 rounded-md hover:bg-accent-red/10 text-surface-700 hover:text-accent-red transition-colors" title="Delete">
+            <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
@@ -133,6 +171,9 @@ export default function BoardPage() {
   const [showForm, setShowForm] = useState(false)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const draggedTaskRef = useRef<Task | null>(null)
+
+  // Mobile touch drag state
+  const [touchDragTask, setTouchDragTask] = useState<Task | null>(null)
 
   const fetchAll = useCallback(async () => {
     const [tasksRes, statusesRes, categoriesRes] = await Promise.all([
@@ -164,7 +205,7 @@ export default function BoardPage() {
     fetchAll()
   }
 
-  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null }) => {
+  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null }) => {
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -174,7 +215,7 @@ export default function BoardPage() {
     fetchAll()
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null; progress?: number }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -189,7 +230,7 @@ export default function BoardPage() {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
   }
 
-  // Drag and drop
+  // Desktop drag and drop
   const handleDragStart = (e: React.DragEvent, task: Task) => {
     draggedTaskRef.current = task
     e.dataTransfer.effectAllowed = 'move'
@@ -212,11 +253,8 @@ export default function BoardPage() {
     })
   }
 
-  const handleDrop = async (e: React.DragEvent, targetStatusId: string) => {
-    e.preventDefault()
-    setDragOverColumn(null)
-    const task = draggedTaskRef.current
-    if (!task || task.status_id === targetStatusId) { draggedTaskRef.current = null; return }
+  const moveTaskToStatus = async (task: Task, targetStatusId: string) => {
+    if (task.status_id === targetStatusId) return
 
     const targetStatus = statuses.find(s => s.id === targetStatusId)
     const update: Record<string, string | number> = { status_id: targetStatusId }
@@ -240,8 +278,23 @@ export default function BoardPage() {
       } : t
     ))
 
-    draggedTaskRef.current = null
     await handleUpdateTask(task.id, update)
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetStatusId: string) => {
+    e.preventDefault()
+    setDragOverColumn(null)
+    const task = draggedTaskRef.current
+    if (!task) return
+    draggedTaskRef.current = null
+    await moveTaskToStatus(task, targetStatusId)
+  }
+
+  // Mobile touch drag - tap column to move
+  const handleTouchDropToColumn = async (targetStatusId: string) => {
+    if (!touchDragTask) return
+    await moveTaskToStatus(touchDragTask, targetStatusId)
+    setTouchDragTask(null)
   }
 
   useEffect(() => {
@@ -257,7 +310,6 @@ export default function BoardPage() {
     const sid = task.status_id || ''
     if (columnTasks[sid]) columnTasks[sid].push(task)
     else if (statuses.length > 0) {
-      // Fallback: unassigned tasks go to default
       const defaultS = statuses.find(s => s.is_default) || statuses[0]
       if (defaultS) columnTasks[defaultS.id]?.push(task)
     }
@@ -281,6 +333,45 @@ export default function BoardPage() {
           <Plus className="w-4 h-4" /> New Task
         </button>
       </div>
+
+      {/* Mobile touch drag banner */}
+      {touchDragTask && (
+        <div className="lg:hidden card p-3 border-brand-500/40 bg-brand-600/10 animate-slide-down">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-medium text-brand-400">
+              Moving: <span className="text-white">{touchDragTask.title}</span>
+            </p>
+            <button
+              onClick={() => setTouchDragTask(null)}
+              className="p-1 rounded-lg hover:bg-surface-300/30 text-surface-700"
+            >
+              <span className="text-xs text-surface-700">Cancel</span>
+            </button>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {statuses.map(s => (
+              <button
+                key={s.id}
+                onClick={() => handleTouchDropToColumn(s.id)}
+                disabled={s.id === touchDragTask.status_id}
+                className={cn(
+                  'flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all border',
+                  s.id === touchDragTask.status_id
+                    ? 'opacity-40 cursor-not-allowed border-surface-300/20'
+                    : 'active:scale-95 border-transparent',
+                )}
+                style={{
+                  backgroundColor: s.id === touchDragTask.status_id ? undefined : s.color + '20',
+                  color: s.color,
+                  borderColor: s.id !== touchDragTask.status_id ? s.color + '40' : undefined,
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-32">
@@ -316,7 +407,14 @@ export default function BoardPage() {
                 </div>
                 <div className="flex-1 p-2.5 space-y-2 overflow-y-auto">
                   {colTasks.map(task => (
-                    <KanbanCard key={task.id} task={task} onEdit={setEditingTask} onDelete={handleDeleteTask} onDragStart={handleDragStart} />
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      onEdit={setEditingTask}
+                      onDelete={handleDeleteTask}
+                      onDragStart={handleDragStart}
+                      onTouchDragStart={setTouchDragTask}
+                    />
                   ))}
                   {colTasks.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-12 text-surface-700">

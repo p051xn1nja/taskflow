@@ -25,9 +25,9 @@ import { cn } from '@/lib/utils'
 
 const navItems = [
   { href: '/', icon: CheckSquare, label: 'Tasks' },
+  { href: '/notes', icon: FileText, label: 'Notes' },
   { href: '/board', icon: Columns3, label: 'Board' },
   { href: '/calendar', icon: CalendarDays, label: 'Calendar' },
-  { href: '/notes', icon: FileText, label: 'Notes' },
   { href: '/categories', icon: Tag, label: 'Categories' },
   { href: '/tags', icon: Hash, label: 'Tags' },
   { href: '/statuses', icon: CircleDot, label: 'Statuses' },
@@ -172,15 +172,13 @@ export function Sidebar() {
                 </p>
               </div>
             )}
-            {!collapsed && (
-              <button
-                onClick={() => signOut({ callbackUrl: '/login' })}
-                className="p-2 rounded-lg hover:bg-surface-300/30 text-surface-700 hover:text-accent-red transition-colors"
-                title="Sign out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
+            <button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="p-2 rounded-lg hover:bg-surface-300/30 text-surface-700 hover:text-accent-red transition-colors"
+              title="Sign out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </aside>

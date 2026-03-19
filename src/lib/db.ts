@@ -192,6 +192,11 @@ function initializeSchema(db: Database.Database) {
     db.exec("ALTER TABLE tasks ADD COLUMN status_id TEXT")
   }
 
+  // Migration: add start_date to tasks if missing
+  if (!taskColumnNames.includes('start_date')) {
+    db.exec("ALTER TABLE tasks ADD COLUMN start_date TEXT")
+  }
+
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)
 

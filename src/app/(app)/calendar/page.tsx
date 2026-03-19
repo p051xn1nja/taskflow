@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, Filter, Search,
@@ -23,6 +23,8 @@ interface CalendarItem {
   progress?: number
   category_name?: string
   category_color?: string
+  start_date?: string
+  end_date?: string
 }
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -59,11 +61,25 @@ export default function CalendarPage() {
   const [filterType, setFilterType] = useState('all')
   const [showCreateMenu, setShowCreateMenu] = useState(false)
 
+  // Day click popup state
+  const [dayPopup, setDayPopup] = useState<{ date: string; x: number; y: number } | null>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  // Close popup on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setDayPopup(null)
+      }
+    }
+    if (dayPopup) document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dayPopup])
+
   // Calculate date range for current view
   const dateRange = useMemo(() => {
     const y = currentDate.getFullYear()
     const m = currentDate.getMonth()
-    const d = currentDate.getDate()
 
     if (view === 'day') {
       return { from: toDateStr(currentDate), to: toDateStr(currentDate) }
@@ -77,14 +93,12 @@ export default function CalendarPage() {
     if (view === 'month') {
       const first = new Date(y, m, 1)
       const last = new Date(y, m + 1, 0)
-      // Extend to fill calendar grid
       const gridStart = getMonday(first)
       const gridEnd = new Date(last)
       const endDay = gridEnd.getDay()
       if (endDay !== 0) gridEnd.setDate(gridEnd.getDate() + (7 - endDay))
       return { from: toDateStr(gridStart), to: toDateStr(gridEnd) }
     }
-    // Year
     return { from: `${y}-01-01`, to: `${y}-12-31` }
   }, [currentDate, view])
 
@@ -119,16 +133,41 @@ export default function CalendarPage() {
     })
   }, [])
 
-  // Group items by date
+  // Group items by date - for range tasks, add them to every day in range
   const itemsByDate = useMemo(() => {
     const map: Record<string, CalendarItem[]> = {}
     for (const item of items) {
-      const d = item.date.split('T')[0] || item.date.split(' ')[0]
-      if (!map[d]) map[d] = []
-      map[d].push(item)
+      if (item.type === 'task' && item.start_date && item.end_date) {
+        // Range task: add to every day from start to end
+        const start = new Date(item.start_date + 'T00:00:00')
+        const end = new Date(item.end_date + 'T00:00:00')
+        const cur = new Date(start)
+        while (cur <= end) {
+          const ds = toDateStr(cur)
+          if (!map[ds]) map[ds] = []
+          map[ds].push(item)
+          cur.setDate(cur.getDate() + 1)
+        }
+      } else {
+        const d = item.date.split('T')[0] || item.date.split(' ')[0]
+        if (!map[d]) map[d] = []
+        map[d].push(item)
+      }
     }
     return map
   }, [items])
+
+  // Deduplicated items for a given date (range tasks appear once)
+  const getUniqueItems = (ds: string) => {
+    const dayItems = itemsByDate[ds] || []
+    const seen = new Set<string>()
+    return dayItems.filter(item => {
+      const key = `${item.type}-${item.id}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
 
   // Navigation
   const navigate = (dir: number) => {
@@ -146,14 +185,13 @@ export default function CalendarPage() {
     if (item.type === 'note') router.push(`/notes/${item.id}`)
   }
 
-  const handleCreateTask = () => {
-    // Navigate to tasks page — task form will auto-fill due_date from URL param
-    const dateStr = toDateStr(currentDate)
-    router.push(`/?new_task=1&date=${dateStr}`)
+  const handleCreateTaskForDate = (dateStr: string) => {
+    router.push(`/?new_task=1&start_date=${dateStr}&date=${dateStr}`)
+    setDayPopup(null)
     setShowCreateMenu(false)
   }
 
-  const handleCreateNote = async () => {
+  const handleCreateNoteForDate = async () => {
     const res = await fetch('/api/notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -161,7 +199,27 @@ export default function CalendarPage() {
     })
     const { id } = await res.json()
     router.push(`/notes/${id}`)
+    setDayPopup(null)
     setShowCreateMenu(false)
+  }
+
+  const handleCreateTask = () => {
+    const dateStr = toDateStr(currentDate)
+    handleCreateTaskForDate(dateStr)
+  }
+
+  const handleCreateNote = async () => {
+    await handleCreateNoteForDate()
+  }
+
+  const handleDayClick = (e: React.MouseEvent, dateStr: string) => {
+    e.stopPropagation()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setDayPopup({
+      date: dateStr,
+      x: rect.left + rect.width / 2,
+      y: rect.bottom + 4,
+    })
   }
 
   // Title
@@ -181,7 +239,6 @@ export default function CalendarPage() {
 
   const today = new Date()
 
-  // View buttons
   const viewButtons: { id: ViewMode; icon: React.ReactNode; label: string }[] = [
     { id: 'day', icon: <CalendarDays className="w-3.5 h-3.5" />, label: 'Day' },
     { id: 'week', icon: <CalendarRange className="w-3.5 h-3.5" />, label: 'Week' },
@@ -189,20 +246,66 @@ export default function CalendarPage() {
     { id: 'year', icon: <Grid3X3 className="w-3.5 h-3.5" />, label: 'Year' },
   ]
 
-  const ItemPill = ({ item }: { item: CalendarItem }) => (
-    <button
-      onClick={() => handleItemClick(item)}
-      className={cn(
-        'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium truncate w-full text-left transition-colors',
-        item.type === 'note' ? 'hover:bg-accent-purple/15' : 'hover:bg-surface-300/30',
-        item.is_completed && 'opacity-50 line-through',
-      )}
-      style={{ color: item.color }}
-    >
-      {item.type === 'task' ? <CheckSquare className="w-2.5 h-2.5 flex-shrink-0" /> : <FileText className="w-2.5 h-2.5 flex-shrink-0" />}
-      <span className="truncate">{item.title}</span>
-    </button>
-  )
+  // Check if a task bar should render on this date cell (for month view)
+  const getBarInfo = (item: CalendarItem, dateStr: string) => {
+    if (item.type !== 'task' || !item.start_date || !item.end_date) return null
+    const sd = item.start_date
+    const ed = item.end_date
+    const isStart = dateStr === sd
+    const isEnd = dateStr === ed
+    const isMiddle = dateStr > sd && dateStr < ed
+    if (!isStart && !isEnd && !isMiddle) return null
+    return { isStart, isEnd, isMiddle }
+  }
+
+  const ItemPill = ({ item, dateStr }: { item: CalendarItem; dateStr: string }) => {
+    const barInfo = getBarInfo(item, dateStr)
+
+    // Range task bar rendering
+    if (barInfo) {
+      const { isStart, isEnd, isMiddle } = barInfo
+      return (
+        <button
+          onClick={() => handleItemClick(item)}
+          className={cn(
+            'flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium truncate w-full text-left transition-colors min-h-[20px]',
+            item.is_completed && 'opacity-50',
+            isStart && 'rounded-l',
+            isEnd && 'rounded-r',
+            !isStart && !isEnd && 'px-0.5',
+          )}
+          style={{
+            backgroundColor: item.color + '25',
+            color: item.color,
+            borderLeft: isStart ? `3px solid ${item.color}` : undefined,
+          }}
+        >
+          {isStart && (
+            <>
+              <CheckSquare className="w-2.5 h-2.5 flex-shrink-0" />
+              <span className="truncate">{item.title}</span>
+            </>
+          )}
+        </button>
+      )
+    }
+
+    // Regular pill (single-day task or note)
+    return (
+      <button
+        onClick={() => handleItemClick(item)}
+        className={cn(
+          'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium truncate w-full text-left transition-colors',
+          item.type === 'note' ? 'hover:bg-accent-purple/15' : 'hover:bg-surface-300/30',
+          item.is_completed && 'opacity-50 line-through',
+        )}
+        style={{ color: item.color }}
+      >
+        {item.type === 'task' ? <CheckSquare className="w-2.5 h-2.5 flex-shrink-0" /> : <FileText className="w-2.5 h-2.5 flex-shrink-0" />}
+        <span className="truncate">{item.title}</span>
+      </button>
+    )
+  }
 
   // MONTH VIEW
   const renderMonth = () => {
@@ -219,7 +322,6 @@ export default function CalendarPage() {
         d.setDate(d.getDate() + 1)
       }
       weeks.push(week)
-      // Stop if we've passed the month and filled the row
       if (d.getMonth() !== m && d.getDay() === 1) break
     }
 
@@ -235,17 +337,18 @@ export default function CalendarPage() {
         <div className="grid grid-cols-7">
           {weeks.flat().map((date, idx) => {
             const ds = toDateStr(date)
-            const dayItems = itemsByDate[ds] || []
+            const dayItems = getUniqueItems(ds)
             const isCurrentMonth = date.getMonth() === m
             const isToday = isSameDay(date, today)
             return (
               <div
                 key={idx}
                 className={cn(
-                  'min-h-[100px] border-b border-r border-surface-300/10 p-1.5 transition-colors',
+                  'min-h-[100px] border-b border-r border-surface-300/10 p-1.5 transition-colors cursor-pointer hover:bg-surface-200/20',
                   !isCurrentMonth && 'bg-surface-50/30',
                   isToday && 'bg-brand-600/8',
                 )}
+                onClick={(e) => handleDayClick(e, ds)}
               >
                 <div className={cn(
                   'text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full',
@@ -255,7 +358,7 @@ export default function CalendarPage() {
                 </div>
                 <div className="space-y-0.5">
                   {dayItems.slice(0, 3).map(item => (
-                    <ItemPill key={`${item.type}-${item.id}`} item={item} />
+                    <ItemPill key={`${item.type}-${item.id}`} item={item} dateStr={ds} />
                   ))}
                   {dayItems.length > 3 && (
                     <p className="text-[10px] text-surface-700 px-1.5">+{dayItems.length - 3} more</p>
@@ -283,10 +386,14 @@ export default function CalendarPage() {
       <div className="grid grid-cols-7 gap-2">
         {days.map(date => {
           const ds = toDateStr(date)
-          const dayItems = itemsByDate[ds] || []
+          const dayItems = getUniqueItems(ds)
           const isToday = isSameDay(date, today)
           return (
-            <div key={ds} className={cn('card p-3 min-h-[300px]', isToday && 'ring-2 ring-brand-500/30')}>
+            <div
+              key={ds}
+              className={cn('card p-3 min-h-[300px] cursor-pointer', isToday && 'ring-2 ring-brand-500/30')}
+              onClick={(e) => handleDayClick(e, ds)}
+            >
               <div className="text-center mb-3">
                 <p className="text-[10px] font-semibold text-surface-700 uppercase">{DAYS[days.indexOf(date)]}</p>
                 <p className={cn(
@@ -298,34 +405,44 @@ export default function CalendarPage() {
                 <p className="text-[10px] text-surface-700">{MONTHS_SHORT[date.getMonth()]}</p>
               </div>
               <div className="space-y-1">
-                {dayItems.map(item => (
-                  <button
-                    key={`${item.type}-${item.id}`}
-                    onClick={() => handleItemClick(item)}
-                    className={cn(
-                      'w-full text-left p-2 rounded-lg text-xs transition-colors',
-                      item.type === 'task' ? 'bg-surface-200/40 hover:bg-surface-200/70' : 'bg-accent-purple/8 hover:bg-accent-purple/15',
-                      item.is_completed && 'opacity-50',
-                    )}
-                  >
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      {item.type === 'task' ? (
-                        <CheckSquare className="w-3 h-3 flex-shrink-0" style={{ color: item.color }} />
-                      ) : (
-                        <FileText className="w-3 h-3 flex-shrink-0 text-accent-purple" />
+                {dayItems.map(item => {
+                  const barInfo = getBarInfo(item, ds)
+                  return (
+                    <button
+                      key={`${item.type}-${item.id}`}
+                      onClick={(e) => { e.stopPropagation(); handleItemClick(item) }}
+                      className={cn(
+                        'w-full text-left p-2 rounded-lg text-xs transition-colors',
+                        item.type === 'task' ? 'bg-surface-200/40 hover:bg-surface-200/70' : 'bg-accent-purple/8 hover:bg-accent-purple/15',
+                        item.is_completed && 'opacity-50',
+                        barInfo && 'border-l-2',
                       )}
-                      <span className={cn('font-medium truncate text-surface-950', item.is_completed && 'line-through text-surface-700')}>
-                        {item.title}
-                      </span>
-                    </div>
-                    {item.status_name && (
-                      <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.status_name}</span>
-                    )}
-                    {item.category_name && (
-                      <span className="text-[10px] ml-1" style={{ color: item.category_color }}>{item.category_name}</span>
-                    )}
-                  </button>
-                ))}
+                      style={barInfo ? { borderLeftColor: item.color, backgroundColor: item.color + '10' } : undefined}
+                    >
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        {item.type === 'task' ? (
+                          <CheckSquare className="w-3 h-3 flex-shrink-0" style={{ color: item.color }} />
+                        ) : (
+                          <FileText className="w-3 h-3 flex-shrink-0 text-accent-purple" />
+                        )}
+                        <span className={cn('font-medium truncate text-surface-950', item.is_completed && 'line-through text-surface-700')}>
+                          {item.title}
+                        </span>
+                      </div>
+                      {item.status_name && (
+                        <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.status_name}</span>
+                      )}
+                      {item.category_name && (
+                        <span className="text-[10px] ml-1" style={{ color: item.category_color }}>{item.category_name}</span>
+                      )}
+                      {barInfo && (
+                        <div className="text-[9px] text-surface-700 mt-0.5">
+                          {item.start_date && item.end_date && `${formatDate(item.start_date)} - ${formatDate(item.end_date)}`}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
                 {dayItems.length === 0 && (
                   <p className="text-[10px] text-surface-600 text-center py-4">No items</p>
                 )}
@@ -340,14 +457,17 @@ export default function CalendarPage() {
   // DAY VIEW
   const renderDay = () => {
     const ds = toDateStr(currentDate)
-    const dayItems = itemsByDate[ds] || []
+    const dayItems = getUniqueItems(ds)
     const taskItems = dayItems.filter(i => i.type === 'task')
     const noteItems = dayItems.filter(i => i.type === 'note')
     const isToday = isSameDay(currentDate, today)
 
     return (
       <div className="max-w-2xl mx-auto space-y-4">
-        <div className={cn('card p-6 text-center', isToday && 'ring-2 ring-brand-500/30')}>
+        <div
+          className={cn('card p-6 text-center cursor-pointer hover:bg-surface-200/20', isToday && 'ring-2 ring-brand-500/30')}
+          onClick={(e) => handleDayClick(e, ds)}
+        >
           <p className="text-surface-700 text-sm">{DAYS[(currentDate.getDay() + 6) % 7]}</p>
           <p className={cn('text-4xl font-bold mt-1', isToday ? 'text-brand-400' : 'text-white')}>
             {currentDate.getDate()}
@@ -364,26 +484,35 @@ export default function CalendarPage() {
               <CheckSquare className="w-4 h-4 text-brand-400" /> Tasks ({taskItems.length})
             </h3>
             <div className="space-y-2">
-              {taskItems.map(item => (
-                <div key={item.id} className={cn(
-                  'flex items-center gap-3 p-3 rounded-xl bg-surface-200/40 transition-colors hover:bg-surface-200/70',
-                  item.is_completed && 'opacity-50',
-                )}>
-                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('text-sm font-medium text-surface-950 truncate', item.is_completed && 'line-through text-surface-700')}>
-                      {item.title}
-                    </p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {item.status_name && <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.status_name}</span>}
-                      {item.category_name && <span className="text-[10px]" style={{ color: item.category_color }}>{item.category_name}</span>}
-                      {item.progress != null && item.progress > 0 && !item.is_completed && (
-                        <span className="text-[10px] text-surface-700">{item.progress}%</span>
-                      )}
+              {taskItems.map(item => {
+                const barInfo = getBarInfo(item, ds)
+                return (
+                  <div key={item.id} className={cn(
+                    'flex items-center gap-3 p-3 rounded-xl bg-surface-200/40 transition-colors hover:bg-surface-200/70',
+                    item.is_completed && 'opacity-50',
+                    barInfo && 'border-l-3',
+                  )}
+                  style={barInfo ? { borderLeftColor: item.color, borderLeftWidth: '3px' } : undefined}
+                  >
+                    <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className={cn('text-sm font-medium text-surface-950 truncate', item.is_completed && 'line-through text-surface-700')}>
+                        {item.title}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {item.status_name && <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.status_name}</span>}
+                        {item.category_name && <span className="text-[10px]" style={{ color: item.category_color }}>{item.category_name}</span>}
+                        {item.progress != null && item.progress > 0 && !item.is_completed && (
+                          <span className="text-[10px] text-surface-700">{item.progress}%</span>
+                        )}
+                        {item.start_date && item.end_date && (
+                          <span className="text-[10px] text-surface-600">{formatDate(item.start_date)} - {formatDate(item.end_date)}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -423,7 +552,6 @@ export default function CalendarPage() {
         {Array.from({ length: 12 }, (_, m) => {
           const firstDay = new Date(y, m, 1)
           const gridStart = getMonday(firstDay)
-          const daysInMonth = new Date(y, m + 1, 0).getDate()
           const weeks: Date[][] = []
           let d = new Date(gridStart)
           for (let w = 0; w < 6; w++) {
@@ -569,6 +697,34 @@ export default function CalendarPage() {
           {view === 'day' && renderDay()}
           {view === 'year' && renderYear()}
         </>
+      )}
+
+      {/* Day click popup */}
+      {dayPopup && (
+        <div
+          ref={popupRef}
+          className="fixed z-[60] bg-surface-100 border border-surface-300/40 rounded-xl shadow-2xl overflow-hidden min-w-[180px] animate-scale-in"
+          style={{
+            left: Math.min(dayPopup.x - 90, window.innerWidth - 200),
+            top: Math.min(dayPopup.y, window.innerHeight - 120),
+          }}
+        >
+          <div className="px-3 py-2 border-b border-surface-300/20">
+            <p className="text-[11px] font-semibold text-surface-700">{formatDate(dayPopup.date)}</p>
+          </div>
+          <button
+            onClick={() => handleCreateTaskForDate(dayPopup.date)}
+            className="flex items-center gap-2.5 w-full px-4 py-3 text-sm hover:bg-surface-300/30 transition-colors text-surface-900"
+          >
+            <CheckSquare className="w-4 h-4 text-brand-400" /> New Task
+          </button>
+          <button
+            onClick={handleCreateNoteForDate}
+            className="flex items-center gap-2.5 w-full px-4 py-3 text-sm hover:bg-surface-300/30 transition-colors text-surface-900"
+          >
+            <FileText className="w-4 h-4 text-accent-purple" /> New Note
+          </button>
+        </div>
       )}
     </div>
   )

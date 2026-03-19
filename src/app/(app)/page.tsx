@@ -41,11 +41,13 @@ function TasksPageInner() {
   // Form state
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [defaultStartDate, setDefaultStartDate] = useState('')
   const [defaultDueDate, setDefaultDueDate] = useState('')
 
   // Auto-open task form from calendar
   useEffect(() => {
     if (searchParams.get('new_task') === '1') {
+      setDefaultStartDate(searchParams.get('start_date') || searchParams.get('date') || '')
       setDefaultDueDate(searchParams.get('date') || '')
       setShowForm(true)
       // Clean up URL
@@ -95,7 +97,7 @@ function TasksPageInner() {
     return () => clearTimeout(timer)
   }, [fetchTasks])
 
-  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null }) => {
+  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null }) => {
     await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -114,7 +116,7 @@ function TasksPageInner() {
     fetchTasks(pagination.page)
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; due_date: string | null; progress?: number }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -370,9 +372,10 @@ function TasksPageInner() {
       {showForm && (
         <TaskForm
           categories={categories}
+          defaultStartDate={defaultStartDate}
           defaultDueDate={defaultDueDate}
           onSubmit={handleCreateTask}
-          onCancel={() => { setShowForm(false); setDefaultDueDate('') }}
+          onCancel={() => { setShowForm(false); setDefaultStartDate(''); setDefaultDueDate('') }}
         />
       )}
       {editingTask && (

@@ -33,12 +33,14 @@ function getFileIcon(filename: string) {
 interface TaskFormProps {
   task?: Task | null
   categories: Category[]
+  defaultStartDate?: string
   defaultDueDate?: string
   onSubmit: (data: {
     title: string
     description: string
     category_id: string | null
     tags: string[]
+    start_date: string | null
     due_date: string | null
     progress?: number
   }) => void
@@ -47,12 +49,13 @@ interface TaskFormProps {
   onFilesUploaded?: () => void
 }
 
-export function TaskForm({ task, categories, defaultDueDate, onSubmit, onCancel, onDeleteAttachment, onFilesUploaded }: TaskFormProps) {
+export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, onSubmit, onCancel, onDeleteAttachment, onFilesUploaded }: TaskFormProps) {
   const [title, setTitle] = useState(task?.title || '')
   const [description, setDescription] = useState(task?.description || '')
   const [categoryId, setCategoryId] = useState(task?.category_id || '')
   const [tags, setTags] = useState<string[]>(task?.tags?.map(t => typeof t === 'string' ? t : t.name) || [])
   const [tagInput, setTagInput] = useState('')
+  const [startDate, setStartDate] = useState(task?.start_date || defaultStartDate || '')
   const [dueDate, setDueDate] = useState(task?.due_date || defaultDueDate || '')
   const [progress, setProgress] = useState(task?.progress ?? 0)
 
@@ -196,6 +199,7 @@ export function TaskForm({ task, categories, defaultDueDate, onSubmit, onCancel,
       description: description.trim(),
       category_id: categoryId || null,
       tags,
+      start_date: startDate || null,
       due_date: dueDate || null,
       ...(isEditing ? { progress } : {}),
     })
@@ -258,20 +262,31 @@ export function TaskForm({ task, categories, defaultDueDate, onSubmit, onCancel,
             />
           </div>
 
-          {/* Category + Due Date */}
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-surface-800 mb-1.5">Category</label>
+            <select
+              className="input-base"
+              value={categoryId}
+              onChange={e => setCategoryId(e.target.value)}
+            >
+              <option value="">No category</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Start Date + Due Date */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-surface-800 mb-1.5">Category</label>
-              <select
+              <label className="block text-sm font-medium text-surface-800 mb-1.5">Start Date</label>
+              <input
+                type="date"
                 className="input-base"
-                value={categoryId}
-                onChange={e => setCategoryId(e.target.value)}
-              >
-                <option value="">No category</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                value={startDate}
+                onChange={e => setStartDate(e.target.value)}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-surface-800 mb-1.5">Due Date</label>
