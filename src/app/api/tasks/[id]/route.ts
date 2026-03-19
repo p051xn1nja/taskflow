@@ -68,10 +68,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     due_date: 'due_date',
   }
 
+  // Fields where empty string should become null (nullable fields)
+  const nullableFields = new Set(['category_id', 'status_id', 'start_date', 'due_date'])
+
   for (const [key, col] of Object.entries(allowedFields)) {
     if (key in body) {
       updates.push(`${col} = ?`)
-      values.push(body[key] === '' ? null : body[key])
+      values.push(nullableFields.has(key) && body[key] === '' ? null : body[key])
     }
   }
 

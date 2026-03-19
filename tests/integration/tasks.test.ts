@@ -197,6 +197,106 @@ describe('Task with category join (mirrors enriched GET)', () => {
   })
 })
 
+describe('Task date update (mirrors PATCH /api/tasks/:id)', () => {
+  it('saves start_date and due_date when updating a task created without dates', () => {
+    // Step 1: Create task without dates (user creates task without setting dates)
+    seedTask(db, userId, { id: 't1', title: 'May task', start_date: null, due_date: null })
+
+    // Verify no dates
+    const before = db.prepare('SELECT start_date, due_date FROM tasks WHERE id = ?').get('t1') as {
+      start_date: string | null; due_date: string | null
+    }
+    expect(before.start_date).toBeNull()
+    expect(before.due_date).toBeNull()
+
+    // Step 2: Simulate PATCH with dates (exactly what the API handler does)
+    const body = {
+      title: 'May task',
+      description: '',
+      category_id: null,
+      tags: [],
+      start_date: '2026-05-15',
+      due_date: '2026-05-20',
+      progress: 0,
+    }
+
+    const allowedFields: Record<string, string> = {
+      title: 'title',
+      description: 'description',
+      category_id: 'category_id',
+      status: 'status',
+      status_id: 'status_id',
+      progress: 'progress',
+      start_date: 'start_date',
+      due_date: 'due_date',
+    }
+
+    const nullableFields = new Set(['category_id', 'status_id', 'start_date', 'due_date'])
+    const updates: string[] = []
+    const values: (string | number | null)[] = []
+
+    for (const [key, col] of Object.entries(allowedFields)) {
+      if (key in body) {
+        updates.push(`${col} = ?`)
+        const val = (body as Record<string, unknown>)[key] as string | number | null
+        values.push(nullableFields.has(key) && val === '' ? null : val)
+      }
+    }
+
+    updates.push("updated_at = datetime('now')")
+    values.push('t1', userId)
+    db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values)
+
+    // Step 3: Verify dates are saved
+    const after = db.prepare('SELECT start_date, due_date FROM tasks WHERE id = ?').get('t1') as {
+      start_date: string | null; due_date: string | null
+    }
+    expect(after.start_date).toBe('2026-05-15')
+    expect(after.due_date).toBe('2026-05-20')
+  })
+
+  it('clears dates when sending null', () => {
+    seedTask(db, userId, { id: 't1', start_date: '2026-05-15', due_date: '2026-05-20' })
+
+    // Simulate PATCH with null dates (user clears dates)
+    const body = { start_date: null, due_date: null }
+
+    const updates: string[] = []
+    const values: (string | number | null)[] = []
+    for (const [key, val] of Object.entries(body)) {
+      updates.push(`${key} = ?`)
+      values.push(val === '' ? null : val)
+    }
+    updates.push("updated_at = datetime('now')")
+    values.push('t1', userId)
+    db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values)
+
+    const after = db.prepare('SELECT start_date, due_date FROM tasks WHERE id = ?').get('t1') as {
+      start_date: string | null; due_date: string | null
+    }
+    expect(after.start_date).toBeNull()
+    expect(after.due_date).toBeNull()
+  })
+
+  it('dates appear in SELECT t.* after update', () => {
+    seedTask(db, userId, { id: 't1', start_date: null, due_date: null })
+
+    db.prepare("UPDATE tasks SET start_date = ?, due_date = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?")
+      .run('2026-05-15', '2026-05-20', 't1', userId)
+
+    // Simulate the exact query the task list API uses
+    const task = db.prepare(`
+      SELECT t.*, c.name as category_name, c.color as category_color
+      FROM tasks t
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE t.id = ? AND t.user_id = ?
+    `).get('t1', userId) as Record<string, unknown>
+
+    expect(task.start_date).toBe('2026-05-15')
+    expect(task.due_date).toBe('2026-05-20')
+  })
+})
+
 describe('Kanban column mapping logic', () => {
   /**
    * The board page derives columns from status + progress:
