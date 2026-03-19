@@ -33,6 +33,7 @@ src/
 │   │   ├── categories/       # Category management
 │   │   ├── tags/             # Tag management (colors, CRUD)
 │   │   ├── statuses/         # Status management (workflow stages)
+│   │   ├── layout.tsx        # App layout: sidebar + main content + footer
 │   │   └── admin/            # Admin panel (users, settings)
 │   ├── login/        # Auth pages
 │   ├── api/          # REST API endpoints
@@ -170,7 +171,7 @@ Notes have their own content model alongside tasks:
   - **Yearly**: 4x3 mini-month grid with activity dot indicators colored by category, click to drill into month
   - Tasks with both `start_date` and `due_date` render as multi-day bars spanning the date range; task title is shown on every day of the range
   - Tasks shown by `due_date` (or `start_date` for range tasks), notes shown by `created_at`
-  - Clicking a task opens a detail modal (fetched via `GET /api/tasks/:id`) showing title, status, category, progress, description, dates, tags, attachments with download, and timestamps
+  - Clicking a task opens a detail modal (fetched via `GET /api/tasks/:id`) showing title, status, category, progress, description, location, dates, tags, attachments with download, and timestamps
   - Clicking a note navigates to the note editor
   - Filters: category, status, tag, content type (tasks/notes/both)
   - Navigation: prev/next arrows, "Today" quick button
@@ -258,3 +259,4 @@ Managed via Admin → Settings (`platform_settings` table):
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
 - All modals, popups, and dropdown menus close on ESC key and click-outside
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
+- Footer with build info ("TaskFlow build 20260320-21-stable by p051xn1nja") shown on all pages via app layout and login page
