@@ -170,6 +170,7 @@ Notes have their own content model alongside tasks:
   - Clicking a note navigates to the note editor
   - Filters: category, status, tag, content type (tasks/notes/both)
   - Navigation: prev/next arrows, "Today" quick button
+  - Fetch uses AbortController to cancel stale requests on rapid navigation (prevents race condition where old month data overwrites current view)
   - Day-click popup: click any day to get "New Task" / "New Note" options; task pre-fills `start_date` with clicked date
 - **Statuses** (`/statuses`): Manage workflow stages for tasks
   - CRUD for statuses with color picker and "marks as completed" toggle
@@ -209,9 +210,9 @@ Notes have their own content model alongside tasks:
 ## Testing
 
 - **Framework**: Vitest with in-memory SQLite (no external services needed)
-- **Run before submitting**: `npm test` — 91 tests across 7 files, ~5s
+- **Run before submitting**: `npm test` — 110 tests across 8 files, ~3s
 - **Test DB helper**: `tests/helpers/test-db.ts` provides `createTestDb()`, `seedUser()`, `seedCategory()`, `seedTask()`, `seedStatuses()`
-- **Coverage**: utilities, type contracts, schema constraints, foreign key cascades, CRUD operations, Kanban column mapping, build integrity
+- **Coverage**: utilities, type contracts, schema constraints, foreign key cascades, CRUD operations, Kanban column mapping, calendar date-range queries, build integrity
 - **Adding tests**: Place unit tests in `tests/unit/`, integration tests in `tests/integration/`
 
 ## Favicon
