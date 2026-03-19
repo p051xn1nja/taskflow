@@ -130,7 +130,9 @@ Notes have their own content model alongside tasks:
   - Start date and due date shown on each card
 - **Board** (`/board`): Kanban board with dynamic user-defined columns
   - Columns driven by the user's `statuses` table, ordered by `position`
-  - Users can add, rename, reorder, and delete columns via `/statuses`
+  - Inline column management: three-dot menu on each column header to rename or delete statuses directly
+  - Rename uses inline input field with confirm/cancel; delete shows confirmation (default status cannot be deleted)
+  - Users can also manage statuses via the dedicated `/statuses` page
   - HTML5 native drag-and-drop (desktop) with optimistic UI updates
   - Mobile: long-press a card to select it, then tap a status button to move it
   - Moving cards updates `status_id` and `progress` via `PATCH /api/tasks/:id`
@@ -159,6 +161,8 @@ Notes have their own content model alongside tasks:
   - **Yearly**: 4x3 mini-month grid with activity dot indicators, click to drill into month
   - Tasks with both `start_date` and `due_date` render as multi-day bars spanning the date range
   - Tasks shown by `due_date` (or `start_date` for range tasks), notes shown by `created_at`
+  - Clicking a task opens a detail modal (fetched via `GET /api/tasks/:id`) showing title, status, category, progress, description, dates, tags, attachments with download, and timestamps
+  - Clicking a note navigates to the note editor
   - Filters: category, status, tag, content type (tasks/notes/both)
   - Navigation: prev/next arrows, "Today" quick button
   - Day-click popup: click any day to get "New Task" / "New Note" options; task pre-fills `start_date` with clicked date
@@ -191,6 +195,7 @@ Notes have their own content model alongside tasks:
 - **Storage**: `/data/uploads/{id}.{ext}` with metadata in `attachments` / `note_attachments` tables
 - **Upload**: Inline in edit modal/note editor with drag-and-drop zone; files staged before save
 - **Management**: Download and delete individual attachments in edit mode
+- **Task Detail API**: `GET /api/tasks/:id` (single task with enriched tags, attachments, category, status)
 - **Task API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
 - **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download), `DELETE /api/note-uploads/:id` (delete)
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
@@ -238,3 +243,5 @@ Managed via Admin → Settings (`platform_settings` table):
 - Tasks have `start_date` and `due_date` fields; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing
+- All modals, popups, and dropdown menus close on ESC key and click-outside
+- Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
