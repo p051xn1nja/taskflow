@@ -73,7 +73,7 @@ export async function GET(req: Request) {
         type: 'task',
         id: t.id,
         title: t.title,
-        color: t.status_color || '#3b82f6',
+        color: t.category_color || t.status_color || '#3b82f6',
         status_name: t.status_name || undefined,
         is_completed: t.is_completed === 1,
         progress: t.progress,
