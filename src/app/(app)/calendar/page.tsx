@@ -346,7 +346,7 @@ export default function CalendarPage() {
             item.is_completed && 'opacity-50',
             isStart && 'rounded-l',
             isEnd && 'rounded-r',
-            !isStart && !isEnd && 'px-0.5',
+            isMiddle && 'px-1',
           )}
           style={{
             backgroundColor: item.color + '25',
@@ -354,12 +354,8 @@ export default function CalendarPage() {
             borderLeft: isStart ? `3px solid ${item.color}` : undefined,
           }}
         >
-          {isStart && (
-            <>
-              <CheckSquare className="w-2.5 h-2.5 flex-shrink-0" />
-              <span className="truncate">{item.title}</span>
-            </>
-          )}
+          <CheckSquare className="w-2.5 h-2.5 flex-shrink-0" />
+          <span className="truncate">{item.title}</span>
         </button>
       )
     }
