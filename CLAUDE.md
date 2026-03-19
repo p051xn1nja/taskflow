@@ -82,6 +82,10 @@ Task workflow stages are user-defined via the `statuses` table:
 - `is_default` marks which status new tasks get and where tasks go when their status is deleted
 - `position` controls column order on the Board view
 - Deleting a status reassigns all its tasks to the default status with progress=0
+- **Auto-status logic** (in `PATCH /api/tasks/:id`):
+  - Setting progress to 1-99% (without explicit status) auto-assigns the "In Progress" status
+  - Sending legacy `status='completed'` auto-resolves `status_id` to the user's completed status (and vice versa for `in_progress`)
+  - Sending `status_id` auto-syncs the legacy `status` column
 
 ### Tags System
 
@@ -122,19 +126,23 @@ Notes have their own content model alongside tasks:
   - Expanded card view is read-only (description, tags with colors, attachments with download)
   - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
+  - Checkbox toggles completion: sets status to completed (with `status_id` auto-resolved), progress=100, title struck through
+  - Start date and due date shown on each card
 - **Board** (`/board`): Kanban board with dynamic user-defined columns
   - Columns driven by the user's `statuses` table, ordered by `position`
   - Users can add, rename, reorder, and delete columns via `/statuses`
-  - HTML5 native drag-and-drop (zero dependencies) with optimistic UI updates
+  - HTML5 native drag-and-drop (desktop) with optimistic UI updates
+  - Mobile: long-press a card to select it, then tap a status button to move it
   - Moving cards updates `status_id` and `progress` via `PATCH /api/tasks/:id`
   - Dragging to a completed-status column sets progress=100; to default sets progress=0
+  - Drag-over highlight uses Tailwind ring/border classes (inline styles cleared during drag for proper visibility)
   - Tag names displayed as colored badges on kanban cards
 - **Notes** (`/notes`): Card grid view with search, tag filters, pagination
   - Each card shows title, content preview (HTML stripped), tags, linked task count, attachment count
   - Click to open full note editor
 - **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
   - TipTap rich HTML editor: bold, italic, underline, strikethrough, code, headings (H1-H3)
-  - Text colors (12 presets), highlight colors, text alignment (left, center, right, justify)
+  - Text colors (12 presets, w-8 h-8 buttons), highlight colors (8 presets, w-8 h-8 buttons), text alignment (left, center, right, justify)
   - Bullet lists, ordered lists, blockquotes, horizontal rules, code blocks
   - Tables: insert with configurable rows/cols, add/delete rows/columns, table settings modal (border width, border color, cell padding, width)
   - Images: upload via toolbar button, pasted/dropped images uploaded to `/api/editor-upload`
@@ -149,10 +157,11 @@ Notes have their own content model alongside tasks:
   - **Weekly**: 7-column card layout with detailed items per day
   - **Daily**: Focused single-day view with items grouped by type (tasks, notes)
   - **Yearly**: 4x3 mini-month grid with activity dot indicators, click to drill into month
-  - Tasks shown by `due_date`, notes shown by `created_at`
+  - Tasks with both `start_date` and `due_date` render as multi-day bars spanning the date range
+  - Tasks shown by `due_date` (or `start_date` for range tasks), notes shown by `created_at`
   - Filters: category, status, tag, content type (tasks/notes/both)
   - Navigation: prev/next arrows, "Today" quick button
-  - Create menu: "New Task" (redirects to tasks page with pre-filled due date) or "New Note"
+  - Day-click popup: click any day to get "New Task" / "New Note" options; task pre-fills `start_date` with clicked date
 - **Statuses** (`/statuses`): Manage workflow stages for tasks
   - CRUD for statuses with color picker and "marks as completed" toggle
   - Drag-and-drop reordering (changes board column order)
@@ -166,7 +175,7 @@ Notes have their own content model alongside tasks:
   - Progress slider (edit mode only) — updates task progress directly
   - File attachments: upload (drag-and-drop or browse), download, and delete
   - Tags with autocomplete dropdown from master tags, colored badges
-  - Category, due date, title, description editing
+  - Category, start date, due date, title, description editing
   - New files are staged and uploaded on save; attachment deletes are immediate
 - **Admin Panel** (`/admin`): Admin-only dashboard
   - **Users** (`/admin/users`): Manage users — activate/deactivate, approve pending registrations, delete
@@ -224,4 +233,8 @@ Managed via Admin → Settings (`platform_settings` table):
 - Board columns are dynamic — driven by statuses table, fully customizable
 - Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
 - Note-task linking allows associating notes with related tasks (many-to-many)
-- Calendar view shows tasks (by due_date) and notes (by created_at) across day/week/month/year views
+- Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views
+- Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; logout icon visible when collapsed
+- Tasks have `start_date` and `due_date` fields; calendar renders multi-day bars for range tasks
+- Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
+- Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing
