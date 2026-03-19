@@ -7,6 +7,7 @@ import {
   Pencil, Trash2, Loader2, Link2, Paperclip,
 } from 'lucide-react'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
+import { Pagination } from '@/components/Pagination'
 import type { Note, Tag } from '@/types'
 
 function stripHtml(html: string): string {
@@ -218,27 +219,12 @@ export default function NotesPage() {
       )}
 
       {/* Pagination */}
-      {pagination.total_pages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <button
-            onClick={() => fetchNotes(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-            className="btn-secondary text-sm"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-surface-800 px-3">
-            Page {pagination.page} of {pagination.total_pages}
-          </span>
-          <button
-            onClick={() => fetchNotes(pagination.page + 1)}
-            disabled={pagination.page >= pagination.total_pages}
-            className="btn-secondary text-sm"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={pagination.page}
+        totalPages={pagination.total_pages}
+        total={pagination.total}
+        onPageChange={p => fetchNotes(p)}
+      />
     </div>
   )
 }

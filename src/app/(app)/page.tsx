@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
+import { Pagination } from '@/components/Pagination'
 import { cn, groupBy } from '@/lib/utils'
 import type { Task, Category, Status } from '@/types'
 
@@ -55,8 +56,9 @@ function TasksPageInner() {
     }
   }, [searchParams])
 
-  // Collapsed groups
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
+  // Collapsed groups (months and days)
+  const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
 
   const fetchTasks = useCallback(async (page = 1) => {
     setLoading(true)
@@ -139,19 +141,44 @@ function TasksPageInner() {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
   }
 
-  const toggleGroup = (key: string) => {
-    setCollapsedGroups(prev => {
+  const toggleMonth = (key: string) => {
+    setCollapsedMonths(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
       return next
     })
   }
 
-  // Group tasks by date
-  const grouped = groupBy(tasks, task => {
+  const toggleDay = (key: string) => {
+    setCollapsedDays(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
+  // Group tasks by month, then by day
+  const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const todayMonth = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+
+  const groupedByMonth: Record<string, Record<string, Task[]>> = {}
+  for (const task of tasks) {
     const d = new Date(task.created_at)
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  })
+    const monthKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+    const dayKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    if (!groupedByMonth[monthKey]) groupedByMonth[monthKey] = {}
+    if (!groupedByMonth[monthKey][dayKey]) groupedByMonth[monthKey][dayKey] = []
+    groupedByMonth[monthKey][dayKey].push(task)
+  }
+
+  // On initial load / data change, collapse everything except current day's month+day
+  useEffect(() => {
+    const allMonths = Object.keys(groupedByMonth)
+    const allDays = Object.values(groupedByMonth).flatMap(days => Object.keys(days))
+    setCollapsedMonths(new Set(allMonths.filter(m => m !== todayMonth)))
+    setCollapsedDays(new Set(allDays.filter(d => d !== todayStr)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks])
 
   // Stats
   const completedCount = tasks.filter(t => t.task_status?.is_completed ?? t.status === 'completed').length
@@ -313,62 +340,94 @@ function TasksPageInner() {
           <p className="text-surface-700 text-sm mt-1">Create your first task to get started</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(grouped).map(([date, dateTasks]) => (
-            <div key={date}>
-              <button
-                onClick={() => toggleGroup(date)}
-                className="flex items-center gap-2 mb-3 text-sm font-semibold text-surface-700 hover:text-surface-900 transition-colors"
-              >
-                {collapsedGroups.has(date) ? (
-                  <ChevronRight className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
+        <div className="space-y-4">
+          {Object.entries(groupedByMonth).map(([month, days]) => {
+            const monthTaskCount = Object.values(days).reduce((s, d) => s + d.length, 0)
+            const isMonthCollapsed = collapsedMonths.has(month)
+            return (
+              <div key={month} className="card overflow-hidden">
+                {/* Month header */}
+                <button
+                  onClick={() => toggleMonth(month)}
+                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-surface-900 hover:bg-surface-200/40 transition-colors"
+                >
+                  {isMonthCollapsed ? (
+                    <ChevronRight className="w-4 h-4 text-surface-600" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-surface-600" />
+                  )}
+                  <Calendar className="w-3.5 h-3.5 text-brand-400" />
+                  {month}
+                  <span className="text-surface-600 font-normal text-xs ml-auto">
+                    {monthTaskCount} task{monthTaskCount !== 1 ? 's' : ''}
+                  </span>
+                </button>
+
+                {/* Days within month */}
+                {!isMonthCollapsed && (
+                  <div className="border-t border-surface-300/20 animate-fade-in">
+                    {Object.entries(days).map(([day, dayTasks]) => {
+                      const isDayCollapsed = collapsedDays.has(day)
+                      const dayPart = new Date(dayTasks[0].created_at).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+                      const isToday = day === todayStr
+                      return (
+                        <div key={day}>
+                          <button
+                            onClick={() => toggleDay(day)}
+                            className={cn(
+                              'w-full flex items-center gap-2 px-4 py-2 text-xs font-medium transition-colors',
+                              isToday
+                                ? 'text-brand-400 bg-brand-600/5 hover:bg-brand-600/10'
+                                : 'text-surface-700 hover:bg-surface-200/30'
+                            )}
+                          >
+                            {isDayCollapsed ? (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            )}
+                            {dayPart}
+                            {isToday && (
+                              <span className="px-1.5 py-0.5 rounded-md bg-brand-600/15 text-brand-400 text-[10px] font-semibold">
+                                Today
+                              </span>
+                            )}
+                            <span className="font-normal ml-auto opacity-60">
+                              {dayTasks.length}
+                            </span>
+                          </button>
+
+                          {!isDayCollapsed && (
+                            <div className="space-y-2 px-4 pb-3 pt-1 animate-fade-in">
+                              {dayTasks.map(task => (
+                                <TaskCard
+                                  key={task.id}
+                                  task={task}
+                                  onUpdate={handleUpdateTask}
+                                  onDelete={handleDeleteTask}
+                                  onEdit={t => setEditingTask(t)}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
-                <Calendar className="w-3.5 h-3.5" />
-                {date}
-                <span className="text-surface-700 font-normal">({dateTasks.length})</span>
-              </button>
-              {!collapsedGroups.has(date) && (
-                <div className="space-y-2 animate-fade-in">
-                  {dateTasks.map(task => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      onUpdate={handleUpdateTask}
-                      onDelete={handleDeleteTask}
-                      onEdit={t => setEditingTask(t)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       )}
 
       {/* Pagination */}
-      {pagination.total_pages > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-4">
-          <button
-            onClick={() => fetchTasks(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-            className="btn-secondary text-sm"
-          >
-            Previous
-          </button>
-          <span className="text-sm text-surface-800 px-3">
-            Page {pagination.page} of {pagination.total_pages}
-          </span>
-          <button
-            onClick={() => fetchTasks(pagination.page + 1)}
-            disabled={pagination.page >= pagination.total_pages}
-            className="btn-secondary text-sm"
-          >
-            Next
-          </button>
-        </div>
-      )}
+      <Pagination
+        page={pagination.page}
+        totalPages={pagination.total_pages}
+        total={pagination.total}
+        onPageChange={p => fetchTasks(p)}
+      />
 
       {/* Modals */}
       {showForm && (

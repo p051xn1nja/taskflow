@@ -53,6 +53,7 @@ src/
 │   ├── TaskCard.tsx          # List view task card (read-only expanded view)
 │   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags with autocomplete)
 │   ├── RichEditor.tsx        # TipTap rich HTML editor (tables, images, colors, alignment)
+│   ├── Pagination.tsx        # Reusable pagination with page numbers, first/last/prev/next
 │   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
 │   ├── Sidebar.tsx           # Navigation sidebar
 │   └── Providers.tsx         # NextAuth session provider
@@ -124,6 +125,8 @@ Notes have their own content model alongside tasks:
 ## Views
 
 - **Tasks** (`/`): List view with filters, search, pagination
+  - Tasks grouped by month → day with collapsible accordion sections; all collapsed by default except the current day
+  - Month headers show task count; day headers show weekday + day number with "Today" badge
   - Expanded card view is read-only (description, tags with colors, attachments with download)
   - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
@@ -251,5 +254,6 @@ Managed via Admin → Settings (`platform_settings` table):
 - Tasks have `start_date` and `due_date` fields; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing
+- Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
 - All modals, popups, and dropdown menus close on ESC key and click-outside
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
