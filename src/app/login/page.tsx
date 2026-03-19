@@ -197,8 +197,8 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-surface-700 text-xs mt-6">
-          TaskFlow v2.0 &mdash; Modern Task Management
+        <p className="text-center text-surface-600 text-[11px] mt-6 tracking-wide">
+          TaskFlow build 20260320-21-stable by p051xn1nja
         </p>
       </div>
     </div>
