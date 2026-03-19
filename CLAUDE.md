@@ -164,7 +164,7 @@ Notes have their own content model alongside tasks:
   - **Weekly**: 7-column card layout with detailed items per day
   - **Daily**: Focused single-day view with items grouped by type (tasks, notes)
   - **Yearly**: 4x3 mini-month grid with activity dot indicators, click to drill into month
-  - Tasks with both `start_date` and `due_date` render as multi-day bars spanning the date range
+  - Tasks with both `start_date` and `due_date` render as multi-day bars spanning the date range; task title is shown on every day of the range
   - Tasks shown by `due_date` (or `start_date` for range tasks), notes shown by `created_at`
   - Clicking a task opens a detail modal (fetched via `GET /api/tasks/:id`) showing title, status, category, progress, description, dates, tags, attachments with download, and timestamps
   - Clicking a note navigates to the note editor
@@ -245,7 +245,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Board columns are dynamic — driven by statuses table, fully customizable
 - Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
 - Note-task linking allows associating notes with related tasks (many-to-many)
-- Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views
+- Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views; multi-day task bars display the title on every day
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
 - Tasks have `start_date` and `due_date` fields; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
