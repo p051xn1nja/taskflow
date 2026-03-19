@@ -225,13 +225,13 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
               <Palette className="w-3.5 h-3.5" />
             </ToolbarButton>
             {showColorPicker && (
-              <div className="absolute top-full left-0 mt-1 p-2 bg-surface-100 border border-surface-300/40 rounded-lg shadow-xl z-50 grid grid-cols-6 gap-1">
+              <div className="absolute top-full left-0 mt-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 grid grid-cols-6 gap-2">
                 {TEXT_COLORS.map(c => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => { editor.chain().focus().setColor(c).run(); setShowColorPicker(false) }}
-                    className="w-6 h-6 rounded border border-surface-400/30 hover:scale-110 transition-transform"
+                    className="w-8 h-8 rounded-lg border border-surface-400/30 hover:scale-110 transition-transform"
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -245,7 +245,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
               <Highlighter className="w-3.5 h-3.5" />
             </ToolbarButton>
             {showHighlightPicker && (
-              <div className="absolute top-full left-0 mt-1 p-2 bg-surface-100 border border-surface-300/40 rounded-lg shadow-xl z-50 grid grid-cols-4 gap-1">
+              <div className="absolute top-full left-0 mt-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 grid grid-cols-4 gap-2">
                 {HIGHLIGHT_COLORS.map((c, i) => (
                   <button
                     key={c}
@@ -256,13 +256,13 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
                       setShowHighlightPicker(false)
                     }}
                     className={cn(
-                      'w-6 h-6 rounded border border-surface-400/30 hover:scale-110 transition-transform',
+                      'w-8 h-8 rounded-lg border border-surface-400/30 hover:scale-110 transition-transform',
                       i === 0 && 'flex items-center justify-center'
                     )}
                     style={i > 0 ? { backgroundColor: c } : {}}
                     title={i === 0 ? 'Remove highlight' : undefined}
                   >
-                    {i === 0 && <X className="w-3 h-3 text-surface-700" />}
+                    {i === 0 && <X className="w-3.5 h-3.5 text-surface-700" />}
                   </button>
                 ))}
               </div>
