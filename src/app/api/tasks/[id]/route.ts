@@ -48,6 +48,38 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }
   }
 
+  // If legacy status is set without status_id, resolve status_id automatically
+  if ('status' in body && !('status_id' in body)) {
+    if (body.status === 'completed') {
+      const completedStatus = db.prepare('SELECT id FROM statuses WHERE user_id = ? AND is_completed = 1').get(session!.user.id) as { id: string } | undefined
+      if (completedStatus) {
+        updates.push('status_id = ?')
+        values.push(completedStatus.id)
+      }
+    } else if (body.status === 'in_progress') {
+      // Find the "In Progress" status (non-default, non-completed)
+      const inProgressStatus = db.prepare('SELECT id FROM statuses WHERE user_id = ? AND is_default = 0 AND is_completed = 0 ORDER BY position LIMIT 1').get(session!.user.id) as { id: string } | undefined
+      if (inProgressStatus) {
+        updates.push('status_id = ?')
+        values.push(inProgressStatus.id)
+      }
+    }
+  }
+
+  // Auto-move to "In Progress" when progress is set to 1-99% (and no explicit status change)
+  if ('progress' in body && !('status' in body) && !('status_id' in body)) {
+    const progress = Number(body.progress)
+    if (progress >= 1 && progress <= 99) {
+      const inProgressStatus = db.prepare('SELECT id FROM statuses WHERE user_id = ? AND is_default = 0 AND is_completed = 0 ORDER BY position LIMIT 1').get(session!.user.id) as { id: string } | undefined
+      if (inProgressStatus) {
+        updates.push('status_id = ?')
+        values.push(inProgressStatus.id)
+        updates.push('status = ?')
+        values.push('in_progress')
+      }
+    }
+  }
+
   if (updates.length > 0) {
     updates.push("updated_at = datetime('now')")
     values.push(params.id, session!.user.id)

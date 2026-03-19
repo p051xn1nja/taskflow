@@ -390,8 +390,8 @@ export default function BoardPage() {
                   isDragOver && 'ring-2 ring-brand-500/40 border-brand-500/30 bg-brand-600/10',
                 )}
                 style={{
-                  backgroundColor: col.color + '08',
-                  borderColor: col.color + '20',
+                  backgroundColor: isDragOver ? undefined : col.color + '08',
+                  borderColor: isDragOver ? undefined : col.color + '20',
                 }}
                 onDragOver={e => handleDragOver(e, col.id)}
                 onDrop={e => handleDrop(e, col.id)}
