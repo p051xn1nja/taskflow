@@ -19,6 +19,7 @@ interface CalendarItem {
   title: string
   color: string
   status_name?: string
+  status_color?: string
   is_completed?: boolean
   progress?: number
   category_name?: string
@@ -495,12 +496,12 @@ export default function CalendarPage() {
                         ) : (
                           <FileText className="w-3 h-3 flex-shrink-0 text-accent-purple" />
                         )}
-                        <span className={cn('font-medium truncate text-surface-950', item.is_completed && 'line-through text-surface-700')}>
+                        <span className={cn('font-medium truncate', item.is_completed && 'line-through opacity-70')} style={{ color: item.color }}>
                           {item.title}
                         </span>
                       </div>
                       {item.status_name && (
-                        <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.status_name}</span>
+                        <span className="text-[10px] font-medium" style={{ color: item.status_color }}>{item.status_name}</span>
                       )}
                       {item.category_name && (
                         <span className="text-[10px] ml-1" style={{ color: item.category_color }}>{item.category_name}</span>
@@ -566,11 +567,11 @@ export default function CalendarPage() {
                   >
                     <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
                     <div className="flex-1 min-w-0">
-                      <p className={cn('text-sm font-medium text-surface-950 truncate', item.is_completed && 'line-through text-surface-700')}>
+                      <p className={cn('text-sm font-medium truncate', item.is_completed && 'line-through opacity-70')} style={{ color: item.color }}>
                         {item.title}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {item.status_name && <span className="text-[10px] font-medium" style={{ color: item.color }}>{item.status_name}</span>}
+                        {item.status_name && <span className="text-[10px] font-medium" style={{ color: item.status_color }}>{item.status_name}</span>}
                         {item.category_name && <span className="text-[10px]" style={{ color: item.category_color }}>{item.category_name}</span>}
                         {item.progress != null && item.progress > 0 && !item.is_completed && (
                           <span className="text-[10px] text-surface-700">{item.progress}%</span>
