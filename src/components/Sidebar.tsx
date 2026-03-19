@@ -155,7 +155,7 @@ export function Sidebar() {
 
         {/* User */}
         <div className="border-t border-surface-300/20 p-3">
-          <div className={cn('flex items-center gap-3', collapsed ? 'justify-center' : '')}>
+          <div className={cn('flex items-center', collapsed ? 'flex-col gap-2' : 'gap-3')}>
             <div className="w-9 h-9 rounded-xl bg-brand-600/20 border border-brand-500/30 flex items-center justify-center flex-shrink-0">
               <span className="text-sm font-semibold text-brand-400">
                 {session?.user?.display_name?.[0]?.toUpperCase() || session?.user?.username?.[0]?.toUpperCase() || '?'}
