@@ -81,6 +81,7 @@ Task workflow stages are user-defined via the `statuses` table:
 - `is_completed` flag determines done behavior (strikethrough, progress=100, opacity)
 - `is_default` marks which status new tasks get and where tasks go when their status is deleted
 - `position` controls column order on the Board view
+- `tasks.board_position` stores the manual card order within a column (used when sort is "Manual")
 - Deleting a status reassigns all its tasks to the default status with progress=0
 - **Auto-status logic** (in `PATCH /api/tasks/:id`):
   - Setting progress to 1-99% (without explicit status) auto-assigns the "In Progress" status
@@ -134,6 +135,10 @@ Notes have their own content model alongside tasks:
   - Rename uses inline input field with confirm/cancel; delete shows confirmation (default status cannot be deleted)
   - Users can also manage statuses via the dedicated `/statuses` page
   - HTML5 native drag-and-drop (desktop) with optimistic UI updates
+  - **Intra-column reordering**: drag cards within the same column to reorder; a blue drop indicator line shows the insertion point
+  - **Cross-column moves**: drag cards between columns to change status; drop on a specific card to insert at that position
+  - **Sort modes**: "Manual (drag to reorder)" uses persisted `board_position`; other options: created date, due date, progress, title
+  - Dragging to reorder auto-switches sort to "Manual" mode; `board_position` persisted via `POST /api/tasks/reorder`
   - Mobile: long-press a card to select it, then tap a status button to move it
   - Moving cards updates `status_id` and `progress` via `PATCH /api/tasks/:id`
   - Dragging to a completed-status column sets progress=100; to default sets progress=0
@@ -196,6 +201,7 @@ Notes have their own content model alongside tasks:
 - **Upload**: Inline in edit modal/note editor with drag-and-drop zone; files staged before save
 - **Management**: Download and delete individual attachments in edit mode
 - **Task Detail API**: `GET /api/tasks/:id` (single task with enriched tags, attachments, category, status)
+- **Task Reorder API**: `POST /api/tasks/reorder` — batch update `board_position` for kanban card ordering; body: `{ items: [{ id, board_position }] }`
 - **Task API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
 - **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download), `DELETE /api/note-uploads/:id` (delete)
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
