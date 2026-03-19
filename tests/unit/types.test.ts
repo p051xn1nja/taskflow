@@ -20,6 +20,7 @@ describe('Type contracts', () => {
       progress: 0,
       start_date: null,
       due_date: null,
+      board_position: 0,
       created_at: '2025-01-01',
       updated_at: '2025-01-01',
       tags: [],

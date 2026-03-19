@@ -42,6 +42,7 @@ export interface Task {
   progress: number
   start_date: string | null
   due_date: string | null
+  board_position: number
   created_at: string
   updated_at: string
   tags: Tag[]

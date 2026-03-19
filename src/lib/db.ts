@@ -197,6 +197,11 @@ function initializeSchema(db: Database.Database) {
     db.exec("ALTER TABLE tasks ADD COLUMN start_date TEXT")
   }
 
+  // Migration: add board_position to tasks if missing (for kanban card ordering)
+  if (!taskColumnNames.includes('board_position')) {
+    db.exec("ALTER TABLE tasks ADD COLUMN board_position INTEGER NOT NULL DEFAULT 0")
+  }
+
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)
 

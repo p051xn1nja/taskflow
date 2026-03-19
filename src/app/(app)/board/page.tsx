@@ -16,13 +16,17 @@ function KanbanCard({
   onEdit,
   onDelete,
   onDragStart,
+  onDragOver,
   onTouchDragStart,
+  dropIndicator,
 }: {
   task: Task
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
   onDragStart: (e: React.DragEvent, task: Task) => void
+  onDragOver: (e: React.DragEvent, taskId: string) => void
   onTouchDragStart: (task: Task) => void
+  dropIndicator: 'above' | 'below' | null
 }) {
   const isDone = task.task_status?.is_completed ?? task.status === 'completed'
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && !isDone
@@ -56,21 +60,26 @@ function KanbanCard({
   }
 
   return (
-    <div
-      draggable
-      onDragStart={e => onDragStart(e, task)}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className={cn(
-        'group relative rounded-xl border bg-surface-100/80 backdrop-blur-sm p-3.5',
-        'cursor-grab active:cursor-grabbing',
-        'hover:border-surface-500/40 hover:shadow-lg hover:shadow-black/10',
-        'transition-all duration-150 touch-manipulation',
-        'border-surface-300/25',
-        isDone && 'opacity-60',
+    <div className="relative">
+      {dropIndicator === 'above' && (
+        <div className="absolute -top-1.5 left-1 right-1 h-0.5 bg-brand-400 rounded-full z-10" />
       )}
-    >
+      <div
+        draggable
+        onDragStart={e => onDragStart(e, task)}
+        onDragOver={e => onDragOver(e, task.id)}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className={cn(
+          'group relative rounded-xl border bg-surface-100/80 backdrop-blur-sm p-3.5',
+          'cursor-grab active:cursor-grabbing',
+          'hover:border-surface-500/40 hover:shadow-lg hover:shadow-black/10',
+          'transition-all duration-150 touch-manipulation',
+          'border-surface-300/25',
+          isDone && 'opacity-60',
+        )}
+      >
       <div className="absolute top-3 right-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
         <GripVertical className="w-4 h-4 text-surface-700" />
       </div>
@@ -158,6 +167,10 @@ function KanbanCard({
           </button>
         </div>
       </div>
+      {dropIndicator === 'below' && (
+        <div className="absolute -bottom-1.5 left-1 right-1 h-0.5 bg-brand-400 rounded-full z-10" />
+      )}
+    </div>
     </div>
   )
 }
@@ -172,6 +185,9 @@ export default function BoardPage() {
   const [showForm, setShowForm] = useState(false)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const draggedTaskRef = useRef<Task | null>(null)
+
+  // Intra-column drop indicator: which card and above/below
+  const [dropTarget, setDropTarget] = useState<{ taskId: string; position: 'above' | 'below' } | null>(null)
 
   // Mobile touch drag state
   const [touchDragTask, setTouchDragTask] = useState<Task | null>(null)
@@ -285,24 +301,72 @@ export default function BoardPage() {
     requestAnimationFrame(() => { target.style.opacity = '0.4' })
   }
 
-  const handleDragOver = (e: React.DragEvent, columnId: string) => {
+  const handleColumnDragOver = (e: React.DragEvent, columnId: string) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOverColumn(columnId)
   }
 
+  const handleCardDragOver = (e: React.DragEvent, taskId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (draggedTaskRef.current?.id === taskId) {
+      setDropTarget(null)
+      return
+    }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const midY = rect.top + rect.height / 2
+    const position = e.clientY < midY ? 'above' : 'below'
+    setDropTarget({ taskId, position })
+  }
+
   const handleDragEnd = () => {
     setDragOverColumn(null)
+    setDropTarget(null)
     draggedTaskRef.current = null
     document.querySelectorAll('[draggable="true"]').forEach(el => {
       (el as HTMLElement).style.opacity = '1'
     })
   }
 
-  const moveTaskToStatus = async (task: Task, targetStatusId: string) => {
-    if (task.status_id === targetStatusId) return
+  const saveColumnOrder = async (columnId: string, orderedTasks: Task[]) => {
+    const items = orderedTasks.map((t, i) => ({ id: t.id, board_position: i }))
+    // Optimistic: update local state
+    setTasks(prev => {
+      const next = [...prev]
+      for (const item of items) {
+        const idx = next.findIndex(t => t.id === item.id)
+        if (idx >= 0) next[idx] = { ...next[idx], board_position: item.board_position }
+      }
+      return next
+    })
+    await fetch('/api/tasks/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    })
+  }
 
+  const moveTaskToStatus = async (task: Task, targetStatusId: string, insertIndex?: number) => {
     const targetStatus = statuses.find(s => s.id === targetStatusId)
+    const sameColumn = task.status_id === targetStatusId
+
+    if (sameColumn && insertIndex == null) return
+
+    // Handle intra-column reorder
+    if (sameColumn && insertIndex != null) {
+      const colTasks = [...(columnTasks[targetStatusId] || [])]
+      const fromIdx = colTasks.findIndex(t => t.id === task.id)
+      if (fromIdx === -1 || fromIdx === insertIndex) return
+      colTasks.splice(fromIdx, 1)
+      const adjustedIdx = insertIndex > fromIdx ? insertIndex - 1 : insertIndex
+      colTasks.splice(adjustedIdx, 0, task)
+      if (sortBy !== 'manual') setSortBy('manual')
+      await saveColumnOrder(targetStatusId, colTasks)
+      return
+    }
+
+    // Cross-column move
     const update: Record<string, string | number> = { status_id: targetStatusId }
     if (targetStatus?.is_completed) {
       update.progress = 100
@@ -314,6 +378,11 @@ export default function BoardPage() {
       update.status = 'in_progress'
     }
 
+    // If inserting at a position, set board_position
+    if (insertIndex != null) {
+      update.board_position = insertIndex
+    }
+
     // Optimistic
     setTasks(prev => prev.map(t =>
       t.id === task.id ? {
@@ -321,19 +390,57 @@ export default function BoardPage() {
         status_id: targetStatusId,
         task_status: targetStatus ? { ...targetStatus } : null,
         progress: update.progress as number ?? t.progress,
+        board_position: insertIndex ?? t.board_position,
       } : t
     ))
 
     await handleUpdateTask(task.id, update)
+
+    // After cross-column move with position, reorder the target column
+    if (insertIndex != null) {
+      if (sortBy !== 'manual') setSortBy('manual')
+      // Re-fetch to get correct state then reorder
+      const res = await fetch('/api/tasks?per_page=200')
+      const data = await res.json()
+      const allTasks = data.tasks as Task[]
+      const targetTasks = allTasks
+        .filter((t: Task) => t.status_id === targetStatusId)
+        .sort((a: Task, b: Task) => a.board_position - b.board_position)
+      // Move the dropped task to the insert position
+      const movedIdx = targetTasks.findIndex((t: Task) => t.id === task.id)
+      if (movedIdx >= 0) {
+        targetTasks.splice(movedIdx, 1)
+        targetTasks.splice(Math.min(insertIndex, targetTasks.length), 0, allTasks.find((t: Task) => t.id === task.id)!)
+        await saveColumnOrder(targetStatusId, targetTasks)
+      }
+      fetchAll()
+    }
   }
 
   const handleDrop = async (e: React.DragEvent, targetStatusId: string) => {
     e.preventDefault()
-    setDragOverColumn(null)
     const task = draggedTaskRef.current
+    const drop = dropTarget
+    setDragOverColumn(null)
+    setDropTarget(null)
     if (!task) return
     draggedTaskRef.current = null
-    await moveTaskToStatus(task, targetStatusId)
+
+    if (drop) {
+      // Dropped on a specific card — compute insert index
+      const colTasks = columnTasks[targetStatusId] || []
+      const targetIdx = colTasks.findIndex(t => t.id === drop.taskId)
+      if (targetIdx >= 0) {
+        const insertIdx = drop.position === 'below' ? targetIdx + 1 : targetIdx
+        await moveTaskToStatus(task, targetStatusId, insertIdx)
+        return
+      }
+    }
+
+    // Dropped on column background (no specific card) — move to end or just change column
+    if (task.status_id !== targetStatusId) {
+      await moveTaskToStatus(task, targetStatusId)
+    }
   }
 
   // Mobile touch drag - tap column to move
@@ -352,6 +459,8 @@ export default function BoardPage() {
   // Sort comparator
   const sortTasks = useCallback((a: Task, b: Task): number => {
     switch (sortBy) {
+      case 'manual':
+        return a.board_position - b.board_position
       case 'created_asc':
         return a.created_at.localeCompare(b.created_at)
       case 'created_desc':
@@ -418,6 +527,7 @@ export default function BoardPage() {
               value={sortBy}
               onChange={e => setSortBy(e.target.value)}
             >
+              <option value="manual">Manual (drag to reorder)</option>
               <option value="created_desc">Newest first</option>
               <option value="created_asc">Oldest first</option>
               <option value="due_asc">Due date (earliest)</option>
@@ -493,7 +603,14 @@ export default function BoardPage() {
                   backgroundColor: isDragOver ? undefined : col.color + '08',
                   borderColor: isDragOver ? undefined : col.color + '20',
                 }}
-                onDragOver={e => handleDragOver(e, col.id)}
+                onDragOver={e => handleColumnDragOver(e, col.id)}
+                onDragLeave={e => {
+                  // Only clear if leaving the column entirely (not entering a child)
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                    setDragOverColumn(null)
+                    setDropTarget(null)
+                  }
+                }}
                 onDrop={e => handleDrop(e, col.id)}
               >
                 <div className="flex items-center gap-2.5 px-4 py-3.5 border-b" style={{ borderColor: col.color + '20' }}>
@@ -568,7 +685,9 @@ export default function BoardPage() {
                       onEdit={setEditingTask}
                       onDelete={handleDeleteTask}
                       onDragStart={handleDragStart}
+                      onDragOver={handleCardDragOver}
                       onTouchDragStart={setTouchDragTask}
+                      dropIndicator={dropTarget?.taskId === task.id ? dropTarget.position : null}
                     />
                   ))}
                   {colTasks.length === 0 && (

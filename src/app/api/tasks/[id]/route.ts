@@ -66,6 +66,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     progress: 'progress',
     start_date: 'start_date',
     due_date: 'due_date',
+    board_position: 'board_position',
   }
 
   // Fields where empty string should become null (nullable fields)
