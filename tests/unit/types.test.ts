@@ -18,6 +18,7 @@ describe('Type contracts', () => {
       status: 'in_progress',
       status_id: null,
       progress: 0,
+      location: '',
       start_date: null,
       due_date: null,
       board_position: 0,

@@ -23,7 +23,7 @@ export async function GET(req: Request) {
 
   ensureDefaultStatuses(db, userId)
 
-  const items: { date: string; type: 'task' | 'note'; id: string; title: string; color: string; status_name?: string; status_color?: string; is_completed?: boolean; progress?: number; category_name?: string; category_color?: string; start_date?: string; end_date?: string }[] = []
+  const items: { date: string; type: 'task' | 'note'; id: string; title: string; color: string; location?: string; status_name?: string; status_color?: string; is_completed?: boolean; progress?: number; category_name?: string; category_color?: string; start_date?: string; end_date?: string }[] = []
 
   // Fetch tasks that overlap the date range (have start_date or due_date)
   if (types === 'all' || types === 'tasks') {
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
     }
 
     const tasks = db.prepare(`
-      SELECT t.id, t.title, t.start_date, t.due_date, t.progress, t.created_at,
+      SELECT t.id, t.title, t.location, t.start_date, t.due_date, t.progress, t.created_at,
         s.name as status_name, s.color as status_color, s.is_completed,
         c.name as category_name, c.color as category_color
       FROM tasks t
@@ -73,6 +73,7 @@ export async function GET(req: Request) {
         type: 'task',
         id: t.id,
         title: t.title,
+        location: (t as Record<string, unknown>).location as string || undefined,
         color: t.category_color || t.status_color || '#3b82f6',
         status_name: t.status_name || undefined,
         status_color: t.status_color || undefined,

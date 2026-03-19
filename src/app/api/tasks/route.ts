@@ -114,7 +114,7 @@ export async function POST(req: Request) {
   if (error) return error
 
   const body = await req.json()
-  const { title, description, category_id, tags, start_date, due_date, status_id } = body
+  const { title, description, category_id, tags, start_date, due_date, status_id, location } = body
 
   if (!title || title.trim().length === 0) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -140,9 +140,9 @@ export async function POST(req: Request) {
   }
 
   db.prepare(`
-    INSERT INTO tasks (id, user_id, title, description, category_id, start_date, due_date, status_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, start_date || null, due_date || null, resolvedStatusId)
+    INSERT INTO tasks (id, user_id, title, description, category_id, start_date, due_date, status_id, location)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, start_date || null, due_date || null, resolvedStatusId, (location || '').trim())
 
   // Insert tags
   if (tags && Array.isArray(tags)) {

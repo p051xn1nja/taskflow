@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import {
   ChevronDown, ChevronRight, Pencil, Trash2, Check,
-  Paperclip, Calendar, Download, FileText, Hash,
+  Paperclip, Calendar, Download, FileText, Hash, MapPin,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import type { Task } from '@/types'
@@ -110,6 +110,11 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
             {/* Meta row */}
             <div className="flex items-center gap-3 mt-1.5 text-xs text-surface-800 flex-wrap">
               <span>{formatDate(task.created_at)}</span>
+              {task.location && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="w-3 h-3" /> {task.location}
+                </span>
+              )}
               {task.start_date && (
                 <span className="flex items-center gap-1">
                   <Calendar className="w-3 h-3" /> Start {formatDate(task.start_date)}

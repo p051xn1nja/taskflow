@@ -127,11 +127,12 @@ Notes have their own content model alongside tasks:
 - **Tasks** (`/`): List view with filters, search, pagination
   - Tasks grouped by month → day with collapsible accordion sections; all collapsed by default except the current day
   - Month headers show task count; day headers show weekday + day number with "Today" badge
-  - Expanded card view is read-only (description, tags with colors, attachments with download)
+  - Stats cards are dynamic — one card per user-defined status (colored by status), plus Total and Avg Progress; scrollable if many statuses
+  - Expanded card view is read-only (description, location, tags with colors, attachments with download)
   - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
   - Checkbox toggles completion: sets status to completed (with `status_id` auto-resolved), progress=100, title struck through
-  - Start date and due date shown on each card
+  - Location, start date, and due date shown on each card
 - **Board** (`/board`): Kanban board with dynamic user-defined columns
   - Columns driven by the user's `statuses` table, ordered by `position`
   - Inline column management: three-dot menu on each column header to rename or delete statuses directly
@@ -188,7 +189,7 @@ Notes have their own content model alongside tasks:
   - Progress slider (edit mode only) — updates task progress directly
   - File attachments: upload (drag-and-drop or browse), download, and delete
   - Tags with autocomplete dropdown from master tags, colored badges
-  - Category, start date, due date, title, description editing
+  - Category, location, start date, due date, title, description editing
   - New files are staged and uploaded on save; attachment deletes are immediate
 - **Admin Panel** (`/admin`): Admin-only dashboard
   - **Users** (`/admin/users`): Manage users — activate/deactivate, approve pending registrations, delete
@@ -251,7 +252,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views; multi-day task bars display the title on every day
 - Calendar task colors use category color (fallback: status color, then default blue); notes use purple
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
-- Tasks have `start_date` and `due_date` fields; calendar renders multi-day bars for range tasks
+- Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages

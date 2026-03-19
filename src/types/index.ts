@@ -40,6 +40,7 @@ export interface Task {
   status: 'in_progress' | 'completed'
   status_id: string | null
   progress: number
+  location: string
   start_date: string | null
   due_date: string | null
   board_position: number

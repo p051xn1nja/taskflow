@@ -202,6 +202,11 @@ function initializeSchema(db: Database.Database) {
     db.exec("ALTER TABLE tasks ADD COLUMN board_position INTEGER NOT NULL DEFAULT 0")
   }
 
+  // Migration: add location to tasks if missing
+  if (!taskColumnNames.includes('location')) {
+    db.exec("ALTER TABLE tasks ADD COLUMN location TEXT NOT NULL DEFAULT ''")
+  }
+
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)
 

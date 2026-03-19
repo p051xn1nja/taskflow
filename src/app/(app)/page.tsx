@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import {
   Plus, Search, Filter, ChevronDown, ChevronRight, X,
-  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2,
+  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot,
 } from 'lucide-react'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
@@ -99,7 +99,7 @@ function TasksPageInner() {
     return () => clearTimeout(timer)
   }, [fetchTasks])
 
-  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null }) => {
+  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string }) => {
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -120,7 +120,7 @@ function TasksPageInner() {
     fetchTasks(pagination.page)
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; progress?: number }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -180,9 +180,12 @@ function TasksPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks])
 
-  // Stats
-  const completedCount = tasks.filter(t => t.task_status?.is_completed ?? t.status === 'completed').length
-  const inProgressCount = tasks.filter(t => !(t.task_status?.is_completed ?? t.status === 'completed')).length
+  // Stats — dynamic per-status counts
+  const statusCounts: Record<string, number> = {}
+  for (const task of tasks) {
+    const sid = task.status_id || ''
+    statusCounts[sid] = (statusCounts[sid] || 0) + 1
+  }
   const avgProgress = tasks.length > 0 ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length) : 0
 
   // Get all unique tags from tasks (tags are now objects with id, name, color)
@@ -206,8 +209,9 @@ function TasksPageInner() {
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="card p-4">
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        {/* Total */}
+        <div className="card p-4 min-w-[140px] flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-brand-600/15 flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-brand-400" />
@@ -218,29 +222,27 @@ function TasksPageInner() {
             </div>
           </div>
         </div>
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-accent-green/15 flex items-center justify-center">
-              <CheckCircle2 className="w-4 h-4 text-accent-green" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{completedCount}</p>
-              <p className="text-xs text-surface-700">Completed</p>
-            </div>
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-accent-amber/15 flex items-center justify-center">
-              <Clock className="w-4 h-4 text-accent-amber" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-white">{inProgressCount}</p>
-              <p className="text-xs text-surface-700">In Progress</p>
+
+        {/* Dynamic per-status */}
+        {statuses.map(s => (
+          <div key={s.id} className="card p-4 min-w-[140px] flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: s.color + '20' }}>
+                {s.is_completed
+                  ? <CheckCircle2 className="w-4 h-4" style={{ color: s.color }} />
+                  : <CircleDot className="w-4 h-4" style={{ color: s.color }} />
+                }
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-white">{statusCounts[s.id] || 0}</p>
+                <p className="text-xs text-surface-700 truncate max-w-[80px]">{s.name}</p>
+              </div>
             </div>
           </div>
-        </div>
-        <div className="card p-4">
+        ))}
+
+        {/* Avg Progress */}
+        <div className="card p-4 min-w-[140px] flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-accent-purple/15 flex items-center justify-center">
               <BarChart3 className="w-4 h-4 text-accent-purple" />

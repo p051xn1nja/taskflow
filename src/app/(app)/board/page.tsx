@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import {
   Plus, Loader2, Calendar, Paperclip, Hash, GripVertical,
   CircleDot, CheckCircle2, Pencil, Trash2, X, Check, MoreVertical,
-  ArrowUpDown,
+  ArrowUpDown, MapPin,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { TaskForm } from '@/components/TaskForm'
@@ -120,6 +120,13 @@ function KanbanCard({
               <Hash className="w-2.5 h-2.5" />{tag.name}
             </span>
           ))}
+        </div>
+      )}
+
+      {task.location && (
+        <div className="flex items-center gap-1 mt-2 text-[10px] text-surface-800">
+          <MapPin className="w-3 h-3 text-surface-700 flex-shrink-0" />
+          <span className="truncate">{task.location}</span>
         </div>
       )}
 
@@ -265,7 +272,7 @@ export default function BoardPage() {
     fetchAll()
   }
 
-  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null }) => {
+  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string }) => {
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -277,7 +284,7 @@ export default function BoardPage() {
     return id as string
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; progress?: number }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X, Plus, Upload, FileText, Download, Trash2, AlertCircle,
-  Image as ImageIcon, FileArchive, FileSpreadsheet, Hash,
+  Image as ImageIcon, FileArchive, FileSpreadsheet, Hash, MapPin,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
 import type { Task, Category, Attachment, Tag } from '@/types'
@@ -42,6 +42,7 @@ interface TaskFormProps {
     tags: string[]
     start_date: string | null
     due_date: string | null
+    location: string
     progress?: number
   }) => Promise<string | void> | void
   onCancel: () => void
@@ -55,6 +56,7 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
   const [categoryId, setCategoryId] = useState(task?.category_id || '')
   const [tags, setTags] = useState<string[]>(task?.tags?.map(t => typeof t === 'string' ? t : t.name) || [])
   const [tagInput, setTagInput] = useState('')
+  const [location, setLocation] = useState(task?.location || '')
   const [startDate, setStartDate] = useState(task?.start_date || defaultStartDate || '')
   const [dueDate, setDueDate] = useState(task?.due_date || defaultDueDate || '')
   const [progress, setProgress] = useState(task?.progress ?? 0)
@@ -201,6 +203,7 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
       tags,
       start_date: startDate || null,
       due_date: dueDate || null,
+      location: location.trim(),
       ...(isEditing ? { progress } : {}),
     })
 
@@ -274,6 +277,22 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
               onChange={e => setDescription(e.target.value)}
               maxLength={1000}
             />
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="block text-sm font-medium text-surface-800 mb-1.5">Location</label>
+            <div className="relative">
+              <MapPin className="w-4 h-4 text-surface-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                className="input-base pl-10"
+                placeholder="Add a location..."
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+                maxLength={200}
+              />
+            </div>
           </div>
 
           {/* Category */}

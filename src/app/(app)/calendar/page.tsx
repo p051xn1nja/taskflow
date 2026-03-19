@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, Filter, Search,
   CalendarDays, CalendarRange, Calendar as CalendarIcon, Grid3X3,
-  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download,
+  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download, MapPin,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import type { Category, Status, Tag, Task } from '@/types'
@@ -834,6 +834,14 @@ export default function CalendarPage() {
                   <div className="text-sm text-surface-800 bg-surface-200/40 rounded-xl p-3 whitespace-pre-wrap">
                     {taskDetail.description}
                   </div>
+                </div>
+              )}
+
+              {/* Location */}
+              {taskDetail.location && (
+                <div className="flex items-center gap-1.5 mb-4 text-xs text-surface-800">
+                  <MapPin className="w-3.5 h-3.5 text-surface-700 flex-shrink-0" />
+                  {taskDetail.location}
                 </div>
               )}
 
