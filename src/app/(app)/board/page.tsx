@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react'
 import {
   Plus, Loader2, Calendar, Paperclip, Hash, GripVertical,
   CircleDot, CheckCircle2, Pencil, Trash2, X, Check, MoreVertical,
+  ArrowUpDown,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { TaskForm } from '@/components/TaskForm'
@@ -175,6 +176,9 @@ export default function BoardPage() {
   // Mobile touch drag state
   const [touchDragTask, setTouchDragTask] = useState<Task | null>(null)
 
+  // Sort state
+  const [sortBy, setSortBy] = useState<string>('created_desc')
+
   // Column menu state
   const [columnMenu, setColumnMenu] = useState<string | null>(null)
   const [renamingColumn, setRenamingColumn] = useState<string | null>(null)
@@ -343,6 +347,36 @@ export default function BoardPage() {
     return () => document.removeEventListener('dragend', handler)
   }, [])
 
+  // Sort comparator
+  const sortTasks = useCallback((a: Task, b: Task): number => {
+    switch (sortBy) {
+      case 'created_asc':
+        return a.created_at.localeCompare(b.created_at)
+      case 'created_desc':
+        return b.created_at.localeCompare(a.created_at)
+      case 'due_asc':
+        if (!a.due_date && !b.due_date) return 0
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return a.due_date.localeCompare(b.due_date)
+      case 'due_desc':
+        if (!a.due_date && !b.due_date) return 0
+        if (!a.due_date) return 1
+        if (!b.due_date) return -1
+        return b.due_date.localeCompare(a.due_date)
+      case 'progress_asc':
+        return a.progress - b.progress
+      case 'progress_desc':
+        return b.progress - a.progress
+      case 'title_asc':
+        return a.title.localeCompare(b.title)
+      case 'title_desc':
+        return b.title.localeCompare(a.title)
+      default:
+        return 0
+    }
+  }, [sortBy])
+
   // Group tasks by status
   const columnTasks: Record<string, Task[]> = {}
   statuses.forEach(s => { columnTasks[s.id] = [] })
@@ -354,6 +388,11 @@ export default function BoardPage() {
       if (defaultS) columnTasks[defaultS.id]?.push(task)
     }
   })
+
+  // Sort cards within each column
+  for (const id of Object.keys(columnTasks)) {
+    columnTasks[id].sort(sortTasks)
+  }
 
   const totalTasks = tasks.length
   const doneCount = tasks.filter(t => t.task_status?.is_completed).length
@@ -369,9 +408,28 @@ export default function BoardPage() {
             {totalTasks > 0 && <span className="text-surface-700"> &middot; {completionRate}% complete</span>}
           </p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> New Task
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <ArrowUpDown className="w-3.5 h-3.5 text-surface-700 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <select
+              className="input-base text-xs pl-8 pr-3 py-1.5 min-w-[160px]"
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+              <option value="due_asc">Due date (earliest)</option>
+              <option value="due_desc">Due date (latest)</option>
+              <option value="progress_desc">Progress (high → low)</option>
+              <option value="progress_asc">Progress (low → high)</option>
+              <option value="title_asc">Title (A → Z)</option>
+              <option value="title_desc">Title (Z → A)</option>
+            </select>
+          </div>
+          <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+            <Plus className="w-4 h-4" /> New Task
+          </button>
+        </div>
       </div>
 
       {/* Mobile touch drag banner */}
