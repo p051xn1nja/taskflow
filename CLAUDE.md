@@ -155,7 +155,7 @@ Notes have their own content model alongside tasks:
   - Each note card shows title, content preview (HTML stripped), tags, linked task count, attachment count
   - Color picker dropdown (palette icon) on each card to set a card accent color (18 presets); opens upward to avoid clipping; color shown as colored left border
   - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
-  - Click to open full note editor
+  - Click opens a read-only detail modal (title, tags, HTML content, linked tasks, attachments, timestamps); Edit button navigates to full editor
 - **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
   - Color picker in header toolbar and in the RichEditor toolbar to set note card accent color (same 18 presets as notes list)
   - TipTap rich HTML editor: bold, italic, underline, strikethrough, code, headings (H1-H3)
@@ -178,7 +178,7 @@ Notes have their own content model alongside tasks:
   - Tasks shown by `due_date` (or `start_date` for range tasks), notes shown by `created_at`
   - Clicking a task opens a detail modal (fetched via `GET /api/tasks/:id`) showing title, status, category, progress, description, location, dates, tags, attachments with download, and timestamps
   - Task detail modal has an Edit button (pencil icon) that opens the TaskForm edit modal for inline editing; calendar refreshes on save
-  - Clicking a note navigates to the note editor
+  - Clicking a note opens a read-only detail modal (same pattern as task detail); Edit button navigates to note editor
   - Filters: category, status, tag, content type (tasks/notes/both)
   - Navigation: prev/next arrows, "Today" quick button
   - Fetch uses AbortController to cancel stale requests on rapid navigation (prevents race condition where old month data overwrites current view)
