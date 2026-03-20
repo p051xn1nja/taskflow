@@ -30,6 +30,7 @@ src/
 │   │   ├── board/page.tsx    # Kanban board view
 │   │   ├── notes/            # Notes list + note editor ([id])
 │   │   ├── calendar/         # Calendar view (day/week/month/year)
+│   │   ├── profile/          # User profile editing (display name, email, password, photo)
 │   │   ├── categories/       # Category management
 │   │   ├── tags/             # Tag management (colors, CRUD)
 │   │   ├── statuses/         # Status management (workflow stages)
@@ -46,6 +47,7 @@ src/
 │   │   ├── uploads/          # Task file upload, download, delete
 │   │   ├── note-uploads/     # Note file upload, download, delete
 │   │   ├── editor-upload/    # Rich editor inline image upload + serve
+│   │   ├── profile/          # Self-service profile update (display name, email, password)
 │   │   ├── admin/            # Admin: users CRUD, platform settings
 │   │   └── auth/             # NextAuth + initial setup
 │   ├── icon.tsx      # 32x32 PNG favicon (generated at build time)
@@ -224,6 +226,13 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Tags with autocomplete dropdown from master tags, colored badges
   - Category, location, start date, due date, title, description editing
   - New files are staged and uploaded on save; attachment deletes are immediate
+- **Profile** (`/profile`): Self-service user profile editing
+  - Profile photo upload/change/remove with hover overlay
+  - Display name and email editing with save button
+  - Password change with current password verification and confirmation
+  - Read-only username and role display with join date
+  - Session refreshed via `update()` after profile or photo changes
+  - Navigated to by clicking the username in the sidebar
 - **Admin Panel** (`/admin`): Admin-only dashboard
   - **Users** (`/admin/users`): Manage users — activate/deactivate, approve pending registrations, delete
   - **Settings** (`/admin/settings`): Platform-wide settings (registration, approval, limits)
@@ -287,7 +296,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views; multi-day task bars display the title on every day
 - Calendar task colors use category color (fallback: status color, then default blue); notes use category color (fallback: custom note color, then purple `#a855f7`)
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
-- Sidebar avatar shows profile photo if uploaded; clicking avatar opens menu to upload/change/remove photo; camera overlay on hover
+- Sidebar avatar shows profile photo if uploaded; clicking avatar opens menu to upload/change/remove photo; camera overlay on hover; clicking username/display name navigates to `/profile` for editing
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing; card color picker (w-7 h-7 rounded-full) also available in editor toolbar

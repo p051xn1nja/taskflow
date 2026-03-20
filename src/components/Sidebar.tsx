@@ -252,7 +252,12 @@ export function Sidebar() {
               />
             </div>
             {!collapsed && (
-              <div className="flex-1 min-w-0">
+              <Link
+                href="/profile"
+                onClick={() => setMobileOpen(false)}
+                className="flex-1 min-w-0 hover:opacity-80 transition-opacity"
+                title="Edit profile"
+              >
                 <p className="text-sm font-medium text-surface-900 truncate">
                   {session?.user?.display_name || session?.user?.username}
                 </p>
@@ -260,7 +265,7 @@ export function Sidebar() {
                   {isAdmin && <Shield className="w-3 h-3 text-accent-purple" />}
                   {session?.user?.role}
                 </p>
-              </div>
+              </Link>
             )}
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
