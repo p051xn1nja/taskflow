@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Filter, FileText, Hash, Calendar,
   Pencil, Trash2, Loader2, Link2, Paperclip, Palette, X, ChevronDown, ChevronRight,
-  Download, CheckSquare,
+  Download, CheckSquare, BookOpen, Tag as TagIcon, Clock,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
@@ -370,6 +370,67 @@ export default function NotesPage() {
         <button onClick={handleCreateNote} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> New Note
         </button>
+      </div>
+
+      {/* Stats cards */}
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        {/* Total */}
+        <div className="card p-4 min-w-[140px] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent-purple/15 flex items-center justify-center">
+              <BookOpen className="w-4 h-4 text-accent-purple" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{pagination.total}</p>
+              <p className="text-xs text-surface-700">Total</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tagged */}
+        <div className="card p-4 min-w-[140px] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-brand-600/15 flex items-center justify-center">
+              <TagIcon className="w-4 h-4 text-brand-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{notes.filter(n => n.tags.length > 0).length}</p>
+              <p className="text-xs text-surface-700">Tagged</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Linked to Tasks */}
+        <div className="card p-4 min-w-[140px] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent-green/15 flex items-center justify-center">
+              <Link2 className="w-4 h-4 text-accent-green" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">{notes.filter(n => n.linked_tasks.length > 0).length}</p>
+              <p className="text-xs text-surface-700">Linked</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Updated This Week */}
+        <div className="card p-4 min-w-[140px] flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent-amber/15 flex items-center justify-center">
+              <Clock className="w-4 h-4 text-accent-amber" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {notes.filter(n => {
+                  const d = new Date(n.updated_at)
+                  const now = new Date()
+                  return (now.getTime() - d.getTime()) < 7 * 24 * 60 * 60 * 1000
+                }).length}
+              </p>
+              <p className="text-xs text-surface-700">This Week</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search & Filters */}
