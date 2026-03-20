@@ -43,7 +43,7 @@ const adminItems = [
 ]
 
 export function Sidebar() {
-  const { data: session } = useSession()
+  const { data: session, update } = useSession()
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -70,6 +70,8 @@ export function Sidebar() {
     if (res.ok) {
       const data = await res.json()
       setPhotoUrl(data.url)
+      // Refresh session so profile_photo is updated in the JWT
+      await update()
     }
     setShowPhotoMenu(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -81,7 +83,10 @@ export function Sidebar() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     })
-    if (res.ok) setPhotoUrl('')
+    if (res.ok) {
+      setPhotoUrl('')
+      await update()
+    }
     setShowPhotoMenu(false)
   }
 

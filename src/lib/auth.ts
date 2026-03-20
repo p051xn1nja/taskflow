@@ -89,13 +89,22 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
+      // Fetch latest profile_photo from DB so it reflects uploads without re-login
+      let profilePhoto = token.profile_photo || ''
+      try {
+        const db = getDb()
+        const row = db.prepare('SELECT profile_photo FROM users WHERE id = ?').get(token.id) as { profile_photo: string | null } | undefined
+        if (row) profilePhoto = row.profile_photo || ''
+      } catch {
+        // fallback to token value
+      }
       session.user = {
         id: token.id,
         username: token.username,
         email: token.email as string,
         display_name: token.display_name,
         role: token.role,
-        profile_photo: token.profile_photo || '',
+        profile_photo: profilePhoto,
       }
       return session
     },
