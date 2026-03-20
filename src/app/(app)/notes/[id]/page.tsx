@@ -271,6 +271,7 @@ export default function NoteEditorPage() {
     if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
     await uploadStagedFiles()
     await saveNote()
+    router.push('/notes')
   }
 
   const handleDelete = () => {
