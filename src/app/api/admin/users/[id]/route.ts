@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
-import { getDb } from '@/lib/db'
+import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAdmin } from '@/lib/api-helpers'
 import { hash } from 'bcryptjs'
+import fs from 'fs'
+import path from 'path'
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { error, session } = await requireAdmin()
@@ -64,6 +66,32 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   }
 
   const db = getDb()
+
+  // Delete profile photo file if exists
+  const user = db.prepare('SELECT profile_photo FROM users WHERE id = ?').get(params.id) as { profile_photo: string } | undefined
+  if (user?.profile_photo) {
+    const photoPath = path.join(UPLOADS_PATH, user.profile_photo)
+    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath)
+  }
+
+  // Delete task attachment files
+  const attachments = db.prepare(
+    'SELECT a.filename FROM attachments a JOIN tasks t ON a.task_id = t.id WHERE t.user_id = ?'
+  ).all(params.id) as { filename: string }[]
+  for (const att of attachments) {
+    const attPath = path.join(UPLOADS_PATH, att.filename)
+    if (fs.existsSync(attPath)) fs.unlinkSync(attPath)
+  }
+
+  // Delete note attachment files
+  const noteAttachments = db.prepare(
+    'SELECT na.filename FROM note_attachments na JOIN notes n ON na.note_id = n.id WHERE n.user_id = ?'
+  ).all(params.id) as { filename: string }[]
+  for (const att of noteAttachments) {
+    const attPath = path.join(UPLOADS_PATH, att.filename)
+    if (fs.existsSync(attPath)) fs.unlinkSync(attPath)
+  }
+
   db.prepare('DELETE FROM users WHERE id = ?').run(params.id)
   return NextResponse.json({ success: true })
 }

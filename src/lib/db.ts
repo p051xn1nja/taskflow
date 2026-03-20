@@ -184,6 +184,9 @@ function initializeSchema(db: Database.Database) {
   if (!userColumnNames.includes('pending_approval')) {
     db.exec("ALTER TABLE users ADD COLUMN pending_approval INTEGER NOT NULL DEFAULT 0")
   }
+  if (!userColumnNames.includes('profile_photo')) {
+    db.exec("ALTER TABLE users ADD COLUMN profile_photo TEXT NOT NULL DEFAULT ''")
+  }
 
   // Migration: add status_id to tasks if missing
   const taskColumns = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]

@@ -5,9 +5,10 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Pencil, Trash2, Shield, User, X, Loader2,
-  UserCheck, UserX, Lock,
+  UserCheck, UserX, Lock, Camera,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
+import { useRef } from 'react'
 
 interface UserData {
   id: string
@@ -17,6 +18,7 @@ interface UserData {
   role: 'admin' | 'user'
   is_active: number
   pending_approval: number
+  profile_photo: string
   created_at: string
   task_count: number
 }
@@ -29,6 +31,9 @@ export default function UsersPage() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<UserData | null>(null)
   const [form, setForm] = useState({ username: '', email: '', password: '', display_name: '', role: 'user' })
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (session?.user?.role !== 'admin') { router.push('/'); return }
@@ -43,6 +48,7 @@ export default function UsersPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    let userId = editing?.id
     if (editing) {
       const body: Record<string, string> = {}
       if (form.display_name !== editing.display_name) body.display_name = form.display_name
@@ -55,11 +61,22 @@ export default function UsersPage() {
         body: JSON.stringify(body),
       })
     } else {
-      await fetch('/api/admin/users', {
+      const res = await fetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
+      if (res.ok) {
+        const data = await res.json()
+        userId = data.id
+      }
+    }
+    // Upload profile photo if selected
+    if (photoFile && userId) {
+      const formData = new FormData()
+      formData.append('file', photoFile)
+      formData.append('user_id', userId)
+      await fetch('/api/profile-photo', { method: 'POST', body: formData })
     }
     resetForm()
     fetchUsers()
@@ -98,6 +115,8 @@ export default function UsersPage() {
       display_name: user.display_name,
       role: user.role,
     })
+    setPhotoFile(null)
+    setPhotoPreview(user.profile_photo ? `/api/profile-photo/${user.profile_photo}` : null)
     setShowForm(true)
   }
 
@@ -105,6 +124,8 @@ export default function UsersPage() {
     setShowForm(false)
     setEditing(null)
     setForm({ username: '', email: '', password: '', display_name: '', role: 'user' })
+    setPhotoFile(null)
+    setPhotoPreview(null)
   }
 
   if (session?.user?.role !== 'admin') return null
@@ -131,10 +152,12 @@ export default function UsersPage() {
             <div key={user.id} className="card p-4 group hover:border-surface-400/40 transition-all">
               <div className="flex items-center gap-4">
                 <div className={cn(
-                  'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0',
+                  'w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden',
                   user.role === 'admin' ? 'bg-accent-purple/15' : 'bg-brand-600/15'
                 )}>
-                  {user.role === 'admin' ? (
+                  {user.profile_photo ? (
+                    <img src={`/api/profile-photo/${user.profile_photo}`} alt={user.display_name} className="w-full h-full object-cover" />
+                  ) : user.role === 'admin' ? (
                     <Shield className="w-5 h-5 text-accent-purple" />
                   ) : (
                     <User className="w-5 h-5 text-brand-400" />
@@ -259,6 +282,59 @@ export default function UsersPage() {
                   onChange={e => setForm({ ...form, display_name: e.target.value })}
                   placeholder="Display name"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-surface-800 mb-1.5">Profile Photo</label>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-surface-300/40 bg-surface-200/50 flex items-center justify-center flex-shrink-0">
+                    {photoPreview ? (
+                      <>
+                        <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoFile(null)
+                            setPhotoPreview(null)
+                            if (fileInputRef.current) fileInputRef.current.value = ''
+                            // Remove existing photo for editing user
+                            if (editing?.profile_photo) {
+                              fetch('/api/profile-photo', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ user_id: editing.id }),
+                              })
+                            }
+                          }}
+                          className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-lg text-white hover:bg-black/80"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <Camera className="w-5 h-5 text-surface-700" />
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="btn-secondary text-sm py-1.5 px-3"
+                  >
+                    {photoPreview ? 'Change' : 'Choose Photo'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/gif,image/webp"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setPhotoFile(file)
+                        setPhotoPreview(URL.createObjectURL(file))
+                      }
+                    }}
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-surface-800 mb-1.5">

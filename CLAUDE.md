@@ -105,6 +105,21 @@ Notes have their own content model alongside tasks:
 - `note_tasks`: Links notes to tasks (many-to-many)
 - `note_attachments`: File attachments for notes (same schema as `attachments`)
 
+### Profile Photos
+
+Users can upload a profile photo displayed in the sidebar avatar and admin user list:
+- `users.profile_photo` column stores the filename (e.g., `profile_{id}.{ext}`)
+- **Upload**: `POST /api/profile-photo` — FormData with `file` (image) + optional `user_id` (admin only)
+- **Serve**: `GET /api/profile-photo/{filename}` — serves image publicly (no auth) with 1h cache
+- **Delete**: `DELETE /api/profile-photo` — JSON body with optional `user_id` (admin only); removes file and clears DB
+- **Limits**: 5 MB max, allowed formats: png, jpg, jpeg, gif, webp
+- **Storage**: `/data/uploads/profile_{id}.{ext}`
+- Uploading a new photo auto-deletes the old one
+- Photo can be uploaded during registration (setup page) or from the sidebar (click avatar)
+- Admin can upload/remove photos when creating/editing users
+- Profile photo file is deleted when a user is deleted (along with task/note attachment files)
+- Session includes `profile_photo` field so the sidebar can render it without extra API calls
+
 ## Deployment
 
 - **Domain**: `task.sidecloud.net`
@@ -224,6 +239,7 @@ Notes have their own content model alongside tasks:
 - **Task API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
 - **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download), `DELETE /api/note-uploads/:id` (delete)
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
+- **Profile Photo**: `POST /api/profile-photo` (upload), `GET /api/profile-photo/:filename` (serve), `DELETE /api/profile-photo` (remove)
 
 ## Testing
 
@@ -266,6 +282,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views; multi-day task bars display the title on every day
 - Calendar task colors use category color (fallback: status color, then default blue); notes use their custom color (fallback: purple `#a855f7`)
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
+- Sidebar avatar shows profile photo if uploaded; clicking avatar opens menu to upload/change/remove photo; camera overlay on hover
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing; card color picker (w-7 h-7 rounded-full) also available in editor toolbar

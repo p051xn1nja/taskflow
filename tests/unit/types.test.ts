@@ -55,6 +55,7 @@ describe('Type contracts', () => {
       display_name: 'John',
       role: 'admin',
       is_active: true,
+      profile_photo: '',
       created_at: '2025-01-01',
       updated_at: '2025-01-01',
     }

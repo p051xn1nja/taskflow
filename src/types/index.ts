@@ -5,6 +5,7 @@ export interface User {
   display_name: string
   role: 'admin' | 'user'
   is_active: boolean
+  profile_photo: string
   created_at: string
   updated_at: string
 }

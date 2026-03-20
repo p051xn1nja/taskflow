@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { LogIn, UserPlus, Zap } from 'lucide-react'
+import { LogIn, UserPlus, Zap, Camera, X } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,6 +18,9 @@ export default function LoginPage() {
     password: '',
     display_name: '',
   })
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/auth/setup')
@@ -57,6 +60,12 @@ export default function LoginPage() {
         redirect: false,
       })
       if (signInResult?.ok) {
+        // Upload profile photo if selected
+        if (photoFile) {
+          const formData = new FormData()
+          formData.append('file', photoFile)
+          await fetch('/api/profile-photo', { method: 'POST', body: formData })
+        }
         router.push('/')
         return
       }
@@ -157,6 +166,49 @@ export default function LoginPage() {
                     value={form.display_name}
                     onChange={e => setForm({ ...form, display_name: e.target.value })}
                   />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-surface-800 mb-1.5">
+                    Profile Photo <span className="text-surface-700 font-normal">(optional)</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-surface-300/40 bg-surface-200/50 flex items-center justify-center flex-shrink-0">
+                      {photoPreview ? (
+                        <>
+                          <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => { setPhotoFile(null); setPhotoPreview(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                            className="absolute top-0 right-0 p-0.5 bg-black/60 rounded-bl-lg text-white hover:bg-black/80"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </>
+                      ) : (
+                        <Camera className="w-5 h-5 text-surface-700" />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="btn-secondary text-sm py-1.5 px-3"
+                    >
+                      {photoPreview ? 'Change' : 'Choose Photo'}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/gif,image/webp"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          setPhotoFile(file)
+                          setPhotoPreview(URL.createObjectURL(file))
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
               </>
             )}

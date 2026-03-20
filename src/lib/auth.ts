@@ -11,6 +11,7 @@ declare module 'next-auth' {
       email: string
       display_name: string
       role: 'admin' | 'user'
+      profile_photo: string
     }
   }
   interface User {
@@ -19,6 +20,7 @@ declare module 'next-auth' {
     email: string
     display_name: string
     role: 'admin' | 'user'
+    profile_photo: string
   }
 }
 
@@ -28,6 +30,7 @@ declare module 'next-auth/jwt' {
     username: string
     role: 'admin' | 'user'
     display_name: string
+    profile_photo: string
   }
 }
 
@@ -45,7 +48,7 @@ export const authOptions: NextAuthOptions = {
         const db = getDb()
         const user = db
           .prepare(
-            'SELECT id, username, email, password_hash, display_name, role, is_active FROM users WHERE username = ?'
+            'SELECT id, username, email, password_hash, display_name, role, is_active, profile_photo FROM users WHERE username = ?'
           )
           .get(credentials.username) as {
           id: string
@@ -55,6 +58,7 @@ export const authOptions: NextAuthOptions = {
           display_name: string
           role: 'admin' | 'user'
           is_active: number
+          profile_photo: string
         } | undefined
 
         if (!user || !user.is_active) return null
@@ -68,6 +72,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           display_name: user.display_name,
           role: user.role,
+          profile_photo: user.profile_photo || '',
         }
       },
     }),
@@ -79,6 +84,7 @@ export const authOptions: NextAuthOptions = {
         token.username = user.username
         token.role = user.role
         token.display_name = user.display_name
+        token.profile_photo = user.profile_photo || ''
       }
       return token
     },
@@ -89,6 +95,7 @@ export const authOptions: NextAuthOptions = {
         email: token.email as string,
         display_name: token.display_name,
         role: token.role,
+        profile_photo: token.profile_photo || '',
       }
       return session
     },
