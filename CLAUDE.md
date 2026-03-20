@@ -131,12 +131,14 @@ Notes have their own content model alongside tasks:
   - Search & Filters card uses `relative z-10` to ensure dropdowns render above the collapsible accordion sections below
   - Tag filter is a searchable dropdown/combobox (fetched from `/api/tags`) — type to filter, click to select, clear button to reset
   - Stats cards are dynamic — one card per user-defined status (colored by status), plus Total and Avg Progress; scrollable if many statuses
-  - Expanded card view is read-only (description, location, tags with colors, attachments with download)
+  - Expanded card view is read-only (description, location, tags with colors, attachments with download); expanded content has no left margin on mobile (`ml-0 sm:ml-14`)
   - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
   - Checkbox toggles completion: sets status to completed (with `status_id` auto-resolved), progress=100, title struck through
-  - Location, start date, and due date shown on each card
+  - Location, start date, and due date shown on each card; location truncated on mobile (`max-w-[120px]`)
   - Action buttons (edit/delete) use `opacity-100 lg:opacity-0 lg:group-hover:opacity-100` — always visible on mobile, hover-reveal on desktop
+  - Mobile: task title uses `break-words` for natural wrapping; badges (category, status) on separate row below title; filter grid stacks single-column on mobile (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`); "New Task" button shows shorter "New" text on mobile
+  - Layout uses `h-dvh`/`min-h-dvh` (dynamic viewport height) to properly fill mobile browser viewport accounting for address bar
 - **Board** (`/board`): Kanban board with dynamic user-defined columns
   - Columns driven by the user's `statuses` table, ordered by `position`
   - Inline column management: three-dot menu on each column header to rename or delete statuses directly
