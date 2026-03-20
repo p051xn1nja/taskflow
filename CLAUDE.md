@@ -128,6 +128,7 @@ Notes have their own content model alongside tasks:
 - **Tasks** (`/`): List view with filters, search, pagination
   - Tasks grouped by year → month → day with collapsible accordion sections; all collapsed by default except the current year/month/day
   - Year headers show total task count; month headers show task count; day headers show weekday + day number with "Today" badge
+  - Search & Filters card uses `relative z-10` to ensure dropdowns render above the collapsible accordion sections below
   - Tag filter is a searchable dropdown/combobox (fetched from `/api/tags`) — type to filter, click to select, clear button to reset
   - Stats cards are dynamic — one card per user-defined status (colored by status), plus Total and Avg Progress; scrollable if many statuses
   - Expanded card view is read-only (description, location, tags with colors, attachments with download)
@@ -152,6 +153,7 @@ Notes have their own content model alongside tasks:
   - Tag names displayed as colored badges on kanban cards
 - **Notes** (`/notes`): List view with search, tag filters, pagination — same year → month → day accordion layout as tasks
   - Stats cards: Total (purple), Tagged (brand blue), Linked to tasks (green), This Week (amber) — scrollable row, same pattern as Tasks stats
+  - Search & Filters card uses `relative z-10` to ensure dropdowns render above the collapsible accordion sections below
   - Notes grouped by year → month → day (by `updated_at`) with collapsible sections; current year/month/day expanded by default
   - Each note card shows title, content preview (HTML stripped), tags, linked task count, attachment count
   - Color picker dropdown (palette icon) on each card to set a card accent color (18 presets); opens upward to avoid clipping; color shown as colored left border
