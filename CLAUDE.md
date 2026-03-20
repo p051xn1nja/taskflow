@@ -172,6 +172,7 @@ Notes have their own content model alongside tasks:
   - Tasks with both `start_date` and `due_date` render as multi-day bars spanning the date range; task title is shown on every day of the range
   - Tasks shown by `due_date` (or `start_date` for range tasks), notes shown by `created_at`
   - Clicking a task opens a detail modal (fetched via `GET /api/tasks/:id`) showing title, status, category, progress, description, location, dates, tags, attachments with download, and timestamps
+  - Task detail modal has an Edit button (pencil icon) that opens the TaskForm edit modal for inline editing; calendar refreshes on save
   - Clicking a note navigates to the note editor
   - Filters: category, status, tag, content type (tasks/notes/both)
   - Navigation: prev/next arrows, "Today" quick button

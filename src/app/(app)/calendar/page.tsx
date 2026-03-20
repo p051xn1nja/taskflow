@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, Filter, Search,
   CalendarDays, CalendarRange, Calendar as CalendarIcon, Grid3X3,
-  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download, MapPin,
+  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download, MapPin, Pencil,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
+import { TaskForm } from '@/components/TaskForm'
 import type { Category, Status, Tag, Task } from '@/types'
 
 type ViewMode = 'day' | 'week' | 'month' | 'year'
@@ -67,6 +68,9 @@ export default function CalendarPage() {
   const [taskDetailLoading, setTaskDetailLoading] = useState(false)
   const taskDetailRef = useRef<HTMLDivElement>(null)
 
+  // Task edit modal
+  const [editingTask, setEditingTask] = useState<Task | null>(null)
+
   // Abort controller for stale fetch cancellation
   const abortRef = useRef<AbortController | null>(null)
 
@@ -111,6 +115,7 @@ export default function CalendarPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (editingTask) { setEditingTask(null); return }
         if (taskDetail) { setTaskDetail(null); return }
         if (dayPopup) { setDayPopup(null); return }
         if (showCreateMenu) { setShowCreateMenu(false); return }
@@ -118,7 +123,7 @@ export default function CalendarPage() {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [taskDetail, dayPopup, showCreateMenu])
+  }, [editingTask, taskDetail, dayPopup, showCreateMenu])
 
   // Calculate date range for current view
   const dateRange = useMemo(() => {
@@ -285,6 +290,28 @@ export default function CalendarPage() {
 
   const handleCreateNote = async () => {
     await handleCreateNoteForDate()
+  }
+
+  const handleEditTask = () => {
+    if (taskDetail) {
+      setEditingTask(taskDetail)
+      setTaskDetail(null)
+    }
+  }
+
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; progress?: number }) => {
+    if (!editingTask) return
+    await fetch(`/api/tasks/${editingTask.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    setEditingTask(null)
+    fetchItems()
+  }
+
+  const handleDeleteAttachment = async (attachmentId: string) => {
+    await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
   }
 
   const handleDayClick = (e: React.MouseEvent, dateStr: string) => {
@@ -810,9 +837,14 @@ export default function CalendarPage() {
                     )}
                   </div>
                 </div>
-                <button onClick={() => setTaskDetail(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 flex-shrink-0">
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button onClick={handleEditTask} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 hover:text-brand-400 transition-colors" title="Edit task">
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setTaskDetail(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* Progress */}
@@ -918,6 +950,18 @@ export default function CalendarPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Task edit modal */}
+      {editingTask && (
+        <TaskForm
+          task={editingTask}
+          categories={categories}
+          onSubmit={handleEditSubmit}
+          onCancel={() => setEditingTask(null)}
+          onDeleteAttachment={handleDeleteAttachment}
+          onFilesUploaded={() => fetchItems()}
+        />
       )}
 
       {/* Day click popup */}
