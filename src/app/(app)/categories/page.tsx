@@ -65,7 +65,7 @@ export default function CategoriesPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this category? Tasks will be uncategorized.')) return
+    if (!confirm('Delete this category? Tasks and notes will be uncategorized.')) return
     await fetch(`/api/categories/${id}`, { method: 'DELETE' })
     fetchCategories()
   }
@@ -90,7 +90,7 @@ export default function CategoriesPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Categories</h1>
           <p className="text-surface-700 text-sm mt-0.5">
-            Organize your tasks with categories
+            Organize your tasks and notes with categories
           </p>
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
@@ -108,7 +108,7 @@ export default function CategoriesPage() {
             <Tag className="w-8 h-8 text-surface-700" />
           </div>
           <h3 className="text-lg font-medium text-surface-800">No categories yet</h3>
-          <p className="text-surface-700 text-sm mt-1">Create categories to organize your tasks</p>
+          <p className="text-surface-700 text-sm mt-1">Create categories to organize your tasks and notes</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -123,7 +123,7 @@ export default function CategoriesPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-medium text-surface-950 truncate">{cat.name}</h3>
-                  <p className="text-xs text-surface-700">{cat.task_count || 0} tasks</p>
+                  <p className="text-xs text-surface-700">{cat.task_count || 0} tasks &middot; {cat.note_count || 0} notes</p>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button

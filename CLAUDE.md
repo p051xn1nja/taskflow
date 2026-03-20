@@ -100,10 +100,11 @@ Tags are managed via a master `tags` table with `(id, user_id, name, color)`. Ta
 ### Notes System
 
 Notes have their own content model alongside tasks:
-- `notes` table: `(id, user_id, title, content, color, created_at, updated_at)` — content is HTML from the rich editor; color is optional hex for card accent
+- `notes` table: `(id, user_id, title, content, color, category_id, created_at, updated_at)` — content is HTML from the rich editor; color is optional hex for card accent; `category_id` references `categories(id)` ON DELETE SET NULL
 - `note_tags`: Links notes to tags
 - `note_tasks`: Links notes to tasks (many-to-many)
 - `note_attachments`: File attachments for notes (same schema as `attachments`)
+- Categories are shared between tasks and notes — same `categories` table, same CRUD endpoints
 
 ### Profile Photos
 
@@ -170,11 +171,11 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Dragging to a completed-status column sets progress=100; to default sets progress=0
   - Drag-over highlight uses Tailwind ring/border classes (inline styles cleared during drag for proper visibility)
   - Tag names displayed as colored badges on kanban cards
-- **Notes** (`/notes`): List view with search, tag filters, pagination — same year → month → day accordion layout as tasks
+- **Notes** (`/notes`): List view with search, category/tag filters, pagination — same year → month → day accordion layout as tasks
   - Stats cards: Total (purple), Tagged (brand blue), Linked to tasks (green), This Week (amber) — scrollable row, same pattern as Tasks stats
   - Search & Filters card uses `relative z-10` to ensure dropdowns render above the collapsible accordion sections below
   - Notes grouped by year → month → day (by `updated_at`) with collapsible sections; current year/month/day expanded by default
-  - Each note card shows title, content preview (HTML stripped), tags, linked task count, attachment count
+  - Each note card shows title, category badge, content preview (HTML stripped), tags, linked task count, attachment count
   - Color picker dropdown (palette icon) on each card to set a card accent color (18 presets); opens upward to avoid clipping; color shown as colored left border
   - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
   - Click opens a read-only detail modal (title, tags, HTML content, linked tasks, attachments, timestamps); Edit button navigates to full editor
@@ -186,6 +187,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Tables: insert with configurable rows/cols, add/delete rows/columns, table settings modal (border width, border color, cell padding, width)
   - Images: upload via toolbar button, pasted/dropped images uploaded to `/api/editor-upload`
   - Links: add/remove with URL input
+  - Category selector dropdown (same categories as tasks, auto-saves on change)
   - Tag management with autocomplete from master tags
   - Task linking: search and link/unlink tasks to notes
   - File attachments: upload (drag-and-drop or browse), download, delete — same limits as tasks
@@ -277,10 +279,11 @@ Managed via Admin → Settings (`platform_settings` table):
 - Tags are centrally managed with colors — shared between tasks and notes
 - Statuses are user-defined workflow stages; default 3 seeded per user (To Do, In Progress, Completed)
 - Board columns are dynamic — driven by statuses table, fully customizable
+- Categories are universal — shared between tasks and notes; `categories` table with `task_count` and `note_count` in API response; deleting a category sets tasks/notes to uncategorized (ON DELETE SET NULL)
 - Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
 - Note-task linking allows associating notes with related tasks (many-to-many)
 - Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views; multi-day task bars display the title on every day
-- Calendar task colors use category color (fallback: status color, then default blue); notes use their custom color (fallback: purple `#a855f7`)
+- Calendar task colors use category color (fallback: status color, then default blue); notes use category color (fallback: custom note color, then purple `#a855f7`)
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
 - Sidebar avatar shows profile photo if uploaded; clicking avatar opens menu to upload/change/remove photo; camera overlay on hover
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
@@ -289,5 +292,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Note card color palette: 18 colors (Red, Rose, Pink, Fuchsia, Purple, Violet, Indigo, Blue, Sky, Cyan, Teal, Emerald, Green, Lime, Yellow, Amber, Orange) + None
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
 - All modals, popups, and dropdown menus close on ESC key and click-outside
+- Date formatting uses European format (`en-GB` locale): "20 Mar 2026" (day month year); `formatDate()` and `formatDateTime()` in `src/lib/utils.ts`; date grouping keys in tasks/notes pages also use `en-GB`
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
+- Deleting a task or note also deletes all associated attachment files from disk (not just DB cascade)
 - Footer with build info ("TaskFlow build 20260320-21-stable by p051xn1nja") shown on all pages via app layout and login page

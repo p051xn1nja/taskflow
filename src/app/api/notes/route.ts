@@ -16,6 +16,8 @@ export async function GET(req: Request) {
   const db = getDb()
   const userId = session!.user.id
 
+  const categoryId = url.searchParams.get('category_id') || ''
+
   let where = 'WHERE n.user_id = ?'
   const params: (string | number)[] = [userId]
 
@@ -27,6 +29,10 @@ export async function GET(req: Request) {
     where += ' AND n.id IN (SELECT nt.note_id FROM note_tags nt JOIN tags tg ON nt.tag_id = tg.id WHERE tg.name = ?)'
     params.push(tag)
   }
+  if (categoryId) {
+    where += ' AND n.category_id = ?'
+    params.push(categoryId)
+  }
 
   const countRow = db.prepare(`SELECT COUNT(*) as total FROM notes n ${where}`).get(...params) as { total: number }
   const total = countRow.total
@@ -34,12 +40,13 @@ export async function GET(req: Request) {
   const offset = (page - 1) * perPage
 
   const notes = db.prepare(`
-    SELECT n.*
+    SELECT n.*, c.name as category_name, c.color as category_color
     FROM notes n
+    LEFT JOIN categories c ON n.category_id = c.id
     ${where}
     ORDER BY n.updated_at DESC
     LIMIT ? OFFSET ?
-  `).all(...params, perPage, offset) as { id: string; title: string; content: string; created_at: string; updated_at: string }[]
+  `).all(...params, perPage, offset) as { id: string; title: string; content: string; category_id: string | null; category_name: string | null; category_color: string | null; created_at: string; updated_at: string }[]
 
   const getTagsStmt = db.prepare(`
     SELECT tg.id, tg.name, tg.color
@@ -73,7 +80,7 @@ export async function POST(req: Request) {
   if (error) return error
 
   const body = await req.json()
-  const { title, content, tags, linked_task_ids } = body
+  const { title, content, tags, linked_task_ids, category_id } = body
 
   if (!title || title.trim().length === 0) {
     return NextResponse.json({ error: 'Title is required' }, { status: 400 })
@@ -87,8 +94,8 @@ export async function POST(req: Request) {
   const userId = session!.user.id
 
   db.prepare(
-    'INSERT INTO notes (id, user_id, title, content) VALUES (?, ?, ?, ?)'
-  ).run(id, userId, title.trim(), (content || '').trim())
+    'INSERT INTO notes (id, user_id, title, content, category_id) VALUES (?, ?, ?, ?, ?)'
+  ).run(id, userId, title.trim(), (content || '').trim(), category_id || null)
 
   // Insert tags
   if (tags && Array.isArray(tags)) {

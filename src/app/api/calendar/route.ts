@@ -92,17 +92,23 @@ export async function GET(req: Request) {
     let noteWhere = 'WHERE n.user_id = ? AND date(n.created_at) >= ? AND date(n.created_at) <= ?'
     const noteParams: (string | number)[] = [userId, dateFrom, dateTo]
 
+    if (categoryId) {
+      noteWhere += ' AND n.category_id = ?'
+      noteParams.push(categoryId)
+    }
     if (tag) {
       noteWhere += ' AND n.id IN (SELECT nt.note_id FROM note_tags nt JOIN tags tg ON nt.tag_id = tg.id WHERE tg.name = ?)'
       noteParams.push(tag)
     }
 
     const notes = db.prepare(`
-      SELECT n.id, n.title, n.color, n.created_at
+      SELECT n.id, n.title, n.color, n.created_at, n.category_id,
+        c.name as category_name, c.color as category_color
       FROM notes n
+      LEFT JOIN categories c ON n.category_id = c.id
       ${noteWhere}
       ORDER BY n.created_at
-    `).all(...noteParams) as { id: string; title: string; color: string; created_at: string }[]
+    `).all(...noteParams) as { id: string; title: string; color: string; created_at: string; category_id: string | null; category_name: string | null; category_color: string | null }[]
 
     for (const n of notes) {
       items.push({
@@ -110,7 +116,9 @@ export async function GET(req: Request) {
         type: 'note',
         id: n.id,
         title: n.title,
-        color: n.color || '#a855f7',
+        color: n.category_color || n.color || '#a855f7',
+        category_name: n.category_name || undefined,
+        category_color: n.category_color || undefined,
       })
     }
   }

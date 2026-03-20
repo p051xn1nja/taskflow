@@ -11,19 +11,19 @@ export function generateId(): string {
 
 export function formatDate(dateStr: string): string {
   const d = new Date(dateStr)
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
+  return d.toLocaleDateString('en-GB', {
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   })
 }
 
 export function formatDateTime(dateStr: string): string {
   const d = new Date(dateStr)
-  return d.toLocaleString('en-US', {
-    year: 'numeric',
-    month: 'short',
+  return d.toLocaleString('en-GB', {
     day: 'numeric',
+    month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })

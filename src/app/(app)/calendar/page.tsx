@@ -1007,6 +1007,22 @@ export default function CalendarPage() {
                 </div>
               </div>
 
+              {noteDetail.category && (
+                <div className="mb-3">
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium"
+                    style={{
+                      backgroundColor: (noteDetail.category.color || '#64748b') + '20',
+                      color: noteDetail.category.color || '#64748b',
+                      border: `1px solid ${noteDetail.category.color || '#64748b'}30`,
+                    }}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: noteDetail.category.color || '#64748b' }} />
+                    {noteDetail.category.name}
+                  </span>
+                </div>
+              )}
+
               {noteDetail.tags.length > 0 && (
                 <div className="mb-4">
                   <div className="flex flex-wrap gap-1.5">

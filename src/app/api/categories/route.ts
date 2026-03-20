@@ -9,9 +9,12 @@ export async function GET() {
 
   const db = getDb()
   const categories = db.prepare(`
-    SELECT c.*, COUNT(t.id) as task_count
+    SELECT c.*,
+      COUNT(DISTINCT t.id) as task_count,
+      COUNT(DISTINCT n.id) as note_count
     FROM categories c
     LEFT JOIN tasks t ON c.id = t.category_id
+    LEFT JOIN notes n ON c.id = n.category_id
     WHERE c.user_id = ?
     GROUP BY c.id
     ORDER BY c.name ASC

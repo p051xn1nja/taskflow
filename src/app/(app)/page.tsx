@@ -202,16 +202,16 @@ function TasksPageInner() {
 
   // Group tasks by year, then month, then day
   const todayDate = new Date()
-  const todayStr = todayDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const todayMonth = todayDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+  const todayStr = todayDate.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
+  const todayMonth = todayDate.toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })
   const todayYear = String(todayDate.getFullYear())
 
   const groupedByYear: Record<string, Record<string, Record<string, Task[]>>> = {}
   for (const task of tasks) {
     const d = new Date(task.created_at)
     const yearKey = String(d.getFullYear())
-    const monthKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
-    const dayKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    const monthKey = d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })
+    const dayKey = d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
     if (!groupedByYear[yearKey]) groupedByYear[yearKey] = {}
     if (!groupedByYear[yearKey][monthKey]) groupedByYear[yearKey][monthKey] = {}
     if (!groupedByYear[yearKey][monthKey][dayKey]) groupedByYear[yearKey][monthKey][dayKey] = []
@@ -515,7 +515,7 @@ function TasksPageInner() {
                             <div className="border-t border-surface-300/20 animate-fade-in">
                               {Object.entries(days).map(([day, dayTasks]) => {
                                 const isDayCollapsed = collapsedDays.has(day)
-                                const dayPart = new Date(dayTasks[0].created_at).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+                                const dayPart = new Date(dayTasks[0].created_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })
                                 const isToday = day === todayStr
                                 return (
                                   <div key={day}>

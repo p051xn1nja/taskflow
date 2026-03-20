@@ -60,6 +60,7 @@ export interface Category {
   color: string
   created_at: string
   task_count?: number
+  note_count?: number
 }
 
 export interface Attachment {
@@ -88,6 +89,10 @@ export interface Note {
   title: string
   content: string
   color: string
+  category_id: string | null
+  category_name?: string | null
+  category_color?: string | null
+  category?: Category | null
   created_at: string
   updated_at: string
   tags: Tag[]

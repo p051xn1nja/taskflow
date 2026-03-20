@@ -10,9 +10,14 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (error) return error
 
   const db = getDb()
-  const note = db.prepare('SELECT * FROM notes WHERE id = ? AND user_id = ?').get(
+  const note = db.prepare(`
+    SELECT n.*, c.name as category_name, c.color as category_color
+    FROM notes n
+    LEFT JOIN categories c ON n.category_id = c.id
+    WHERE n.id = ? AND n.user_id = ?
+  `).get(
     params.id, session!.user.id
-  ) as { id: string; title: string; content: string; created_at: string; updated_at: string } | undefined
+  ) as { id: string; title: string; content: string; category_id: string | null; category_name: string | null; category_color: string | null; created_at: string; updated_at: string } | undefined
 
   if (!note) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -34,6 +39,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 
   return NextResponse.json({
     ...note,
+    category: note.category_id ? { id: note.category_id, name: note.category_name, color: note.category_color } : null,
     tags,
     attachments,
     linked_tasks,
@@ -66,6 +72,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if ('color' in body) {
     updates.push('color = ?')
     values.push(body.color || '')
+  }
+  if ('category_id' in body) {
+    updates.push('category_id = ?')
+    values.push(body.category_id || null)
   }
 
   if (updates.length > 0) {

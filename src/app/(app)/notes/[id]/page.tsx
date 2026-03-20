@@ -6,11 +6,11 @@ import {
   ArrowLeft, Save, Trash2, Plus, X, Hash, Link2,
   Upload, FileText, Download, AlertCircle, Loader2,
   Image as ImageIcon, FileArchive, FileSpreadsheet,
-  CheckSquare, Search, Palette,
+  CheckSquare, Search, Palette, Tag as TagIcon,
 } from 'lucide-react'
 import { cn, formatFileSize, formatDate } from '@/lib/utils'
 import { RichEditor } from '@/components/RichEditor'
-import type { Note, Tag, NoteAttachment, LinkedTask } from '@/types'
+import type { Note, Tag, NoteAttachment, LinkedTask, Category } from '@/types'
 
 const ALLOWED_EXTENSIONS = new Set([
   'pdf', 'txt', 'md', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
@@ -78,6 +78,8 @@ export default function NoteEditorPage() {
   const [taskSearch, setTaskSearch] = useState('')
   const [availableTasks, setAvailableTasks] = useState<LinkedTask[]>([])
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [categoryId, setCategoryId] = useState<string | null>(null)
+  const [categories, setCategories] = useState<Category[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -90,6 +92,7 @@ export default function NoteEditorPage() {
       setTitle(note.title)
       setContent(note.content)
       setNoteColor(note.color || '')
+      setCategoryId(note.category_id || null)
       setTags(note.tags.map(t => t.name))
       setAttachments(note.attachments)
       setLinkedTasks(note.linked_tasks)
@@ -98,13 +101,14 @@ export default function NoteEditorPage() {
     loadNote()
   }, [noteId, router])
 
-  // Load tags for autocomplete
+  // Load tags for autocomplete and categories
   useEffect(() => {
     fetch('/api/tags').then(r => r.json()).then(setAllTags).catch(() => {})
+    fetch('/api/categories').then(r => r.json()).then(setCategories).catch(() => {})
   }, [])
 
   // Auto-save (debounced)
-  const saveNote = useCallback(async (t?: string, c?: string, tg?: string[], lt?: string[]) => {
+  const saveNote = useCallback(async (t?: string, c?: string, tg?: string[], lt?: string[], catId?: string | null) => {
     setSaving(true)
     await fetch(`/api/notes/${noteId}`, {
       method: 'PATCH',
@@ -114,11 +118,12 @@ export default function NoteEditorPage() {
         content: c ?? content,
         tags: tg ?? tags,
         linked_task_ids: lt ?? linkedTasks.map(lt => lt.id),
+        category_id: catId !== undefined ? catId : categoryId,
       }),
     })
     setSaving(false)
     setHasUnsavedChanges(false)
-  }, [noteId, title, content, tags, linkedTasks])
+  }, [noteId, title, content, tags, linkedTasks, categoryId])
 
   const scheduleAutoSave = useCallback(() => {
     setHasUnsavedChanges(true)
@@ -402,6 +407,25 @@ export default function NoteEditorPage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Category */}
+      <div className="flex items-center gap-2">
+        <TagIcon className="w-4 h-4 text-surface-700 flex-shrink-0" />
+        <select
+          className="input-base text-sm py-1.5 max-w-xs"
+          value={categoryId || ''}
+          onChange={e => {
+            const newCatId = e.target.value || null
+            setCategoryId(newCatId)
+            saveNote(undefined, undefined, undefined, undefined, newCatId)
+          }}
+        >
+          <option value="">No category</option>
+          {categories.map(cat => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
+          ))}
+        </select>
       </div>
 
       {/* Rich Editor */}

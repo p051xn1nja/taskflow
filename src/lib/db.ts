@@ -216,6 +216,9 @@ function initializeSchema(db: Database.Database) {
   if (!noteColumnNames.includes('color')) {
     db.exec("ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT ''")
   }
+  if (!noteColumnNames.includes('category_id')) {
+    db.exec("ALTER TABLE notes ADD COLUMN category_id TEXT REFERENCES categories(id) ON DELETE SET NULL")
+  }
 
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)

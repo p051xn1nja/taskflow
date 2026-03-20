@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
-import type { Note, Tag } from '@/types'
+import type { Note, Tag, Category } from '@/types'
 
 const NOTE_COLORS = [
   { name: 'None', value: '' },
@@ -40,12 +40,14 @@ export default function NotesPage() {
   const router = useRouter()
   const [notes, setNotes] = useState<Note[]>([])
   const [allTags, setAllTags] = useState<Tag[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({ page: 1, per_page: 50, total: 0, total_pages: 0 })
 
   // Filters
   const [search, setSearch] = useState('')
   const [filterTag, setFilterTag] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
   const [showFilters, setShowFilters] = useState(false)
 
   // Tag filter search
@@ -72,6 +74,7 @@ export default function NotesPage() {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (filterTag) params.set('tag', filterTag)
+    if (filterCategory) params.set('category_id', filterCategory)
     params.set('page', String(page))
     params.set('per_page', '50')
 
@@ -80,14 +83,18 @@ export default function NotesPage() {
     setNotes(data.notes)
     setPagination(data.pagination)
     setLoading(false)
-  }, [search, filterTag])
+  }, [search, filterTag, filterCategory])
 
   const fetchTags = async () => {
     const res = await fetch('/api/tags')
     setAllTags(await res.json())
   }
+  const fetchCategories = async () => {
+    const res = await fetch('/api/categories')
+    setCategories(await res.json())
+  }
 
-  useEffect(() => { fetchTags() }, [])
+  useEffect(() => { fetchTags(); fetchCategories() }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => fetchNotes(), 300)
@@ -199,16 +206,16 @@ export default function NotesPage() {
 
   // Group notes by year > month > day (using updated_at like tasks use created_at)
   const todayDate = new Date()
-  const todayStr = todayDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const todayMonth = todayDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+  const todayStr = todayDate.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
+  const todayMonth = todayDate.toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })
   const todayYear = String(todayDate.getFullYear())
 
   const groupedByYear: Record<string, Record<string, Record<string, Note[]>>> = {}
   for (const note of notes) {
     const d = new Date(note.updated_at)
     const yearKey = String(d.getFullYear())
-    const monthKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
-    const dayKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    const monthKey = d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long' })
+    const dayKey = d.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' })
     if (!groupedByYear[yearKey]) groupedByYear[yearKey] = {}
     if (!groupedByYear[yearKey][monthKey]) groupedByYear[yearKey][monthKey] = {}
     if (!groupedByYear[yearKey][monthKey][dayKey]) groupedByYear[yearKey][monthKey][dayKey] = []
@@ -254,6 +261,19 @@ export default function NotesPage() {
                 <h3 className="font-medium text-surface-950 truncate">
                   {note.title}
                 </h3>
+                {note.category_name && (
+                  <span
+                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium"
+                    style={{
+                      backgroundColor: (note.category_color || '#64748b') + '20',
+                      color: note.category_color || '#64748b',
+                      border: `1px solid ${note.category_color || '#64748b'}30`,
+                    }}
+                  >
+                    <TagIcon className="w-2.5 h-2.5" />
+                    {note.category_name}
+                  </span>
+                )}
               </div>
 
               {/* Content preview */}
@@ -456,6 +476,20 @@ export default function NotesPage() {
 
         {showFilters && (
           <div className="pt-2 border-t border-surface-300/20 animate-slide-down">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Category filter */}
+            <select
+              className="input-base text-sm"
+              value={filterCategory}
+              onChange={e => setFilterCategory(e.target.value)}
+            >
+              <option value="">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+
+            {/* Tag filter */}
             <div className="relative" ref={tagDropdownRef}>
               <button
                 type="button"
@@ -534,6 +568,7 @@ export default function NotesPage() {
                 </div>
               )}
             </div>
+            </div>
           </div>
         )}
       </div>
@@ -607,7 +642,7 @@ export default function NotesPage() {
                             <div className="border-t border-surface-300/20 animate-fade-in">
                               {Object.entries(days).map(([day, dayNotes]) => {
                                 const isDayCollapsed = collapsedDays.has(day)
-                                const dayPart = new Date(dayNotes[0].updated_at).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+                                const dayPart = new Date(dayNotes[0].updated_at).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })
                                 const isToday = day === todayStr
                                 return (
                                   <div key={day}>
@@ -694,6 +729,23 @@ export default function NotesPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Category */}
+              {noteDetail.category && (
+                <div className="mb-3">
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium"
+                    style={{
+                      backgroundColor: (noteDetail.category.color || '#64748b') + '20',
+                      color: noteDetail.category.color || '#64748b',
+                      border: `1px solid ${noteDetail.category.color || '#64748b'}30`,
+                    }}
+                  >
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: noteDetail.category.color || '#64748b' }} />
+                    {noteDetail.category.name}
+                  </span>
+                </div>
+              )}
 
               {/* Tags */}
               {noteDetail.tags.length > 0 && (
