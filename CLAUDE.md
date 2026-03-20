@@ -151,6 +151,7 @@ Notes have their own content model alongside tasks:
   - Drag-over highlight uses Tailwind ring/border classes (inline styles cleared during drag for proper visibility)
   - Tag names displayed as colored badges on kanban cards
 - **Notes** (`/notes`): List view with search, tag filters, pagination — same year → month → day accordion layout as tasks
+  - Stats cards: Total (purple), Tagged (brand blue), Linked to tasks (green), This Week (amber) — scrollable row, same pattern as Tasks stats
   - Notes grouped by year → month → day (by `updated_at`) with collapsible sections; current year/month/day expanded by default
   - Each note card shows title, content preview (HTML stripped), tags, linked task count, attachment count
   - Color picker dropdown (palette icon) on each card to set a card accent color (18 presets); opens upward to avoid clipping; color shown as colored left border
