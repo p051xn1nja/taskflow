@@ -434,7 +434,7 @@ export default function NotesPage() {
       </div>
 
       {/* Search & Filters */}
-      <div className="card p-4 space-y-3">
+      <div className="card p-4 space-y-3 relative z-10">
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-surface-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
