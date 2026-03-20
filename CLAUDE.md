@@ -126,8 +126,9 @@ Notes have their own content model alongside tasks:
 ## Views
 
 - **Tasks** (`/`): List view with filters, search, pagination
-  - Tasks grouped by month → day with collapsible accordion sections; all collapsed by default except the current day
-  - Month headers show task count; day headers show weekday + day number with "Today" badge
+  - Tasks grouped by year → month → day with collapsible accordion sections; all collapsed by default except the current year/month/day
+  - Year headers show total task count; month headers show task count; day headers show weekday + day number with "Today" badge
+  - Tag filter is a searchable dropdown/combobox (fetched from `/api/tags`) — type to filter, click to select, clear button to reset
   - Stats cards are dynamic — one card per user-defined status (colored by status), plus Total and Avg Progress; scrollable if many statuses
   - Expanded card view is read-only (description, location, tags with colors, attachments with download)
   - Tag names displayed as colored badges on each task card
@@ -149,9 +150,10 @@ Notes have their own content model alongside tasks:
   - Dragging to a completed-status column sets progress=100; to default sets progress=0
   - Drag-over highlight uses Tailwind ring/border classes (inline styles cleared during drag for proper visibility)
   - Tag names displayed as colored badges on kanban cards
-- **Notes** (`/notes`): Card grid view with search, tag filters, pagination
-  - Each card shows title, content preview (HTML stripped), tags, linked task count, attachment count
-  - Color picker dropdown (palette icon) on each card to set a card accent color (12 presets); color shown as colored top border
+- **Notes** (`/notes`): List view with search, tag filters, pagination — same year → month → day accordion layout as tasks
+  - Notes grouped by year → month → day (by `updated_at`) with collapsible sections; current year/month/day expanded by default
+  - Each note card shows title, content preview (HTML stripped), tags, linked task count, attachment count
+  - Color picker dropdown (palette icon) on each card to set a card accent color (12 presets); color shown as colored left border
   - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
   - Click to open full note editor
 - **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
@@ -255,7 +257,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Notes use HTML content via TipTap; editor images uploaded to `/api/editor-upload`
 - Note-task linking allows associating notes with related tasks (many-to-many)
 - Calendar view shows tasks (by due_date/start_date range) and notes (by created_at) across day/week/month/year views; multi-day task bars display the title on every day
-- Calendar task colors use category color (fallback: status color, then default blue); notes use purple
+- Calendar task colors use category color (fallback: status color, then default blue); notes use their custom color (fallback: purple `#a855f7`)
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons

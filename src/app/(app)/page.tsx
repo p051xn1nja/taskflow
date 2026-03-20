@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -11,7 +11,7 @@ import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
 import { Pagination } from '@/components/Pagination'
 import { cn, groupBy } from '@/lib/utils'
-import type { Task, Category, Status } from '@/types'
+import type { Task, Category, Status, Tag as TagType } from '@/types'
 
 export default function TasksPage() {
   return (
@@ -27,6 +27,7 @@ function TasksPageInner() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [statuses, setStatuses] = useState<Status[]>([])
+  const [allTags, setAllTags] = useState<TagType[]>([])
   const [loading, setLoading] = useState(true)
   const [pagination, setPagination] = useState({ page: 1, per_page: 50, total: 0, total_pages: 0 })
 
@@ -38,6 +39,11 @@ function TasksPageInner() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+
+  // Tag filter search
+  const [tagFilterSearch, setTagFilterSearch] = useState('')
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const tagDropdownRef = useRef<HTMLDivElement>(null)
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -56,7 +62,8 @@ function TasksPageInner() {
     }
   }, [searchParams])
 
-  // Collapsed groups (months and days)
+  // Collapsed groups (years, months, days)
+  const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set())
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
 
@@ -89,15 +96,43 @@ function TasksPageInner() {
     setStatuses(await res.json())
   }
 
+  const fetchTags = async () => {
+    const res = await fetch('/api/tags')
+    setAllTags(await res.json())
+  }
+
   useEffect(() => {
     fetchCategories()
     fetchStatuses()
+    fetchTags()
   }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => fetchTasks(), 300)
     return () => clearTimeout(timer)
   }, [fetchTasks])
+
+  // Close tag dropdown on outside click
+  useEffect(() => {
+    if (!showTagDropdown) return
+    const handler = (e: MouseEvent) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setShowTagDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showTagDropdown])
+
+  // ESC to close tag dropdown
+  useEffect(() => {
+    if (!showTagDropdown) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowTagDropdown(false)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [showTagDropdown])
 
   const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string }) => {
     const res = await fetch('/api/tasks', {
@@ -141,6 +176,14 @@ function TasksPageInner() {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
   }
 
+  const toggleYear = (key: string) => {
+    setCollapsedYears(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
+
   const toggleMonth = (key: string) => {
     setCollapsedMonths(prev => {
       const next = new Set(prev)
@@ -157,24 +200,32 @@ function TasksPageInner() {
     })
   }
 
-  // Group tasks by month, then by day
-  const todayStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-  const todayMonth = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+  // Group tasks by year, then month, then day
+  const todayDate = new Date()
+  const todayStr = todayDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  const todayMonth = todayDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+  const todayYear = String(todayDate.getFullYear())
 
-  const groupedByMonth: Record<string, Record<string, Task[]>> = {}
+  const groupedByYear: Record<string, Record<string, Record<string, Task[]>>> = {}
   for (const task of tasks) {
     const d = new Date(task.created_at)
+    const yearKey = String(d.getFullYear())
     const monthKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     const dayKey = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    if (!groupedByMonth[monthKey]) groupedByMonth[monthKey] = {}
-    if (!groupedByMonth[monthKey][dayKey]) groupedByMonth[monthKey][dayKey] = []
-    groupedByMonth[monthKey][dayKey].push(task)
+    if (!groupedByYear[yearKey]) groupedByYear[yearKey] = {}
+    if (!groupedByYear[yearKey][monthKey]) groupedByYear[yearKey][monthKey] = {}
+    if (!groupedByYear[yearKey][monthKey][dayKey]) groupedByYear[yearKey][monthKey][dayKey] = []
+    groupedByYear[yearKey][monthKey][dayKey].push(task)
   }
 
-  // On initial load / data change, collapse everything except current day's month+day
+  // On initial load / data change, collapse everything except current day's year+month+day
   useEffect(() => {
-    const allMonths = Object.keys(groupedByMonth)
-    const allDays = Object.values(groupedByMonth).flatMap(days => Object.keys(days))
+    const allYears = Object.keys(groupedByYear)
+    const allMonths = Object.values(groupedByYear).flatMap(months => Object.keys(months))
+    const allDays = Object.values(groupedByYear).flatMap(months =>
+      Object.values(months).flatMap(days => Object.keys(days))
+    )
+    setCollapsedYears(new Set(allYears.filter(y => y !== todayYear)))
     setCollapsedMonths(new Set(allMonths.filter(m => m !== todayMonth)))
     setCollapsedDays(new Set(allDays.filter(d => d !== todayStr)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,10 +239,11 @@ function TasksPageInner() {
   }
   const avgProgress = tasks.length > 0 ? Math.round(tasks.reduce((s, t) => s + t.progress, 0) / tasks.length) : 0
 
-  // Get all unique tags from tasks (tags are now objects with id, name, color)
-  const allTags = tasks.flatMap(t => t.tags).filter((tag, i, arr) =>
-    arr.findIndex(t => t.name === tag.name) === i
+  // Tag filter helpers
+  const filteredDropdownTags = allTags.filter(t =>
+    t.name.toLowerCase().includes(tagFilterSearch.toLowerCase())
   )
+  const selectedTagObj = allTags.find(t => t.name === filterTag)
 
   return (
     <div className="space-y-6">
@@ -312,18 +364,84 @@ function TasksPageInner() {
               onChange={e => setDateTo(e.target.value)}
               placeholder="To date"
             />
-            {allTags.length > 0 && (
-              <select
-                className="input-base text-sm col-span-2"
-                value={filterTag}
-                onChange={e => setFilterTag(e.target.value)}
+            <div className="relative col-span-2" ref={tagDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+                className="input-base text-sm w-full text-left flex items-center justify-between"
               >
-                <option value="">All Tags</option>
-                {allTags.map(t => (
-                  <option key={t.name} value={t.name}>{t.name}</option>
-                ))}
-              </select>
-            )}
+                <span className="flex items-center gap-2 truncate">
+                  {filterTag ? (
+                    <>
+                      {selectedTagObj && (
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: selectedTagObj.color }} />
+                      )}
+                      <span className="text-surface-900">{filterTag}</span>
+                    </>
+                  ) : (
+                    <span className="text-surface-700">All Tags</span>
+                  )}
+                </span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {filterTag && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setFilterTag(''); setTagFilterSearch('') }}
+                      className="p-0.5 rounded hover:bg-surface-300/40 text-surface-700 hover:text-surface-900"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <ChevronDown className={cn('w-4 h-4 text-surface-700 transition-transform', showTagDropdown && 'rotate-180')} />
+                </div>
+              </button>
+              {showTagDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-2 border-b border-surface-300/20">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-surface-700 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        className="input-base pl-8 text-sm py-1.5"
+                        placeholder="Search tags..."
+                        value={tagFilterSearch}
+                        onChange={e => setTagFilterSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-surface-300/30 transition-colors',
+                        !filterTag && 'bg-brand-600/10 text-brand-400',
+                      )}
+                      onClick={() => { setFilterTag(''); setTagFilterSearch(''); setShowTagDropdown(false) }}
+                    >
+                      <span className="text-surface-900">All Tags</span>
+                    </button>
+                    {filteredDropdownTags.map(tag => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        className={cn(
+                          'flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-surface-300/30 transition-colors',
+                          filterTag === tag.name && 'bg-brand-600/10 text-brand-400',
+                        )}
+                        onClick={() => { setFilterTag(tag.name); setTagFilterSearch(''); setShowTagDropdown(false) }}
+                      >
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                        <span className="text-surface-900">{tag.name}</span>
+                      </button>
+                    ))}
+                    {filteredDropdownTags.length === 0 && (
+                      <p className="text-xs text-surface-700 text-center py-3">No tags found</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -343,73 +461,105 @@ function TasksPageInner() {
         </div>
       ) : (
         <div className="space-y-4">
-          {Object.entries(groupedByMonth).map(([month, days]) => {
-            const monthTaskCount = Object.values(days).reduce((s, d) => s + d.length, 0)
-            const isMonthCollapsed = collapsedMonths.has(month)
+          {Object.entries(groupedByYear).map(([year, months]) => {
+            const yearTaskCount = Object.values(months).reduce((s, days) =>
+              s + Object.values(days).reduce((s2, d) => s2 + d.length, 0), 0
+            )
+            const isYearCollapsed = collapsedYears.has(year)
             return (
-              <div key={month} className="card overflow-hidden">
-                {/* Month header */}
+              <div key={year} className="space-y-3">
+                {/* Year header */}
                 <button
-                  onClick={() => toggleMonth(month)}
-                  className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-surface-900 hover:bg-surface-200/40 transition-colors"
+                  onClick={() => toggleYear(year)}
+                  className="w-full flex items-center gap-2.5 px-1 py-1 text-sm font-bold text-surface-900 hover:text-white transition-colors"
                 >
-                  {isMonthCollapsed ? (
+                  {isYearCollapsed ? (
                     <ChevronRight className="w-4 h-4 text-surface-600" />
                   ) : (
                     <ChevronDown className="w-4 h-4 text-surface-600" />
                   )}
-                  <Calendar className="w-3.5 h-3.5 text-brand-400" />
-                  {month}
+                  <Calendar className="w-4 h-4 text-brand-400" />
+                  {year}
                   <span className="text-surface-600 font-normal text-xs ml-auto">
-                    {monthTaskCount} task{monthTaskCount !== 1 ? 's' : ''}
+                    {yearTaskCount} task{yearTaskCount !== 1 ? 's' : ''}
                   </span>
                 </button>
 
-                {/* Days within month */}
-                {!isMonthCollapsed && (
-                  <div className="border-t border-surface-300/20 animate-fade-in">
-                    {Object.entries(days).map(([day, dayTasks]) => {
-                      const isDayCollapsed = collapsedDays.has(day)
-                      const dayPart = new Date(dayTasks[0].created_at).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
-                      const isToday = day === todayStr
+                {!isYearCollapsed && (
+                  <div className="space-y-3 animate-fade-in">
+                    {Object.entries(months).map(([month, days]) => {
+                      const monthTaskCount = Object.values(days).reduce((s, d) => s + d.length, 0)
+                      const isMonthCollapsed = collapsedMonths.has(month)
+                      const monthLabel = month.replace(/\s*\d{4}$/, '') // Show just "March" etc since year is parent
                       return (
-                        <div key={day}>
+                        <div key={month} className="card overflow-hidden">
+                          {/* Month header */}
                           <button
-                            onClick={() => toggleDay(day)}
-                            className={cn(
-                              'w-full flex items-center gap-2 px-4 py-2 text-xs font-medium transition-colors',
-                              isToday
-                                ? 'text-brand-400 bg-brand-600/5 hover:bg-brand-600/10'
-                                : 'text-surface-700 hover:bg-surface-200/30'
-                            )}
+                            onClick={() => toggleMonth(month)}
+                            className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-semibold text-surface-900 hover:bg-surface-200/40 transition-colors"
                           >
-                            {isDayCollapsed ? (
-                              <ChevronRight className="w-3.5 h-3.5" />
+                            {isMonthCollapsed ? (
+                              <ChevronRight className="w-4 h-4 text-surface-600" />
                             ) : (
-                              <ChevronDown className="w-3.5 h-3.5" />
+                              <ChevronDown className="w-4 h-4 text-surface-600" />
                             )}
-                            {dayPart}
-                            {isToday && (
-                              <span className="px-1.5 py-0.5 rounded-md bg-brand-600/15 text-brand-400 text-[10px] font-semibold">
-                                Today
-                              </span>
-                            )}
-                            <span className="font-normal ml-auto opacity-60">
-                              {dayTasks.length}
+                            <Calendar className="w-3.5 h-3.5 text-brand-400" />
+                            {monthLabel}
+                            <span className="text-surface-600 font-normal text-xs ml-auto">
+                              {monthTaskCount} task{monthTaskCount !== 1 ? 's' : ''}
                             </span>
                           </button>
 
-                          {!isDayCollapsed && (
-                            <div className="space-y-2 px-4 pb-3 pt-1 animate-fade-in">
-                              {dayTasks.map(task => (
-                                <TaskCard
-                                  key={task.id}
-                                  task={task}
-                                  onUpdate={handleUpdateTask}
-                                  onDelete={handleDeleteTask}
-                                  onEdit={t => setEditingTask(t)}
-                                />
-                              ))}
+                          {/* Days within month */}
+                          {!isMonthCollapsed && (
+                            <div className="border-t border-surface-300/20 animate-fade-in">
+                              {Object.entries(days).map(([day, dayTasks]) => {
+                                const isDayCollapsed = collapsedDays.has(day)
+                                const dayPart = new Date(dayTasks[0].created_at).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' })
+                                const isToday = day === todayStr
+                                return (
+                                  <div key={day}>
+                                    <button
+                                      onClick={() => toggleDay(day)}
+                                      className={cn(
+                                        'w-full flex items-center gap-2 px-4 py-2 text-xs font-medium transition-colors',
+                                        isToday
+                                          ? 'text-brand-400 bg-brand-600/5 hover:bg-brand-600/10'
+                                          : 'text-surface-700 hover:bg-surface-200/30'
+                                      )}
+                                    >
+                                      {isDayCollapsed ? (
+                                        <ChevronRight className="w-3.5 h-3.5" />
+                                      ) : (
+                                        <ChevronDown className="w-3.5 h-3.5" />
+                                      )}
+                                      {dayPart}
+                                      {isToday && (
+                                        <span className="px-1.5 py-0.5 rounded-md bg-brand-600/15 text-brand-400 text-[10px] font-semibold">
+                                          Today
+                                        </span>
+                                      )}
+                                      <span className="font-normal ml-auto opacity-60">
+                                        {dayTasks.length}
+                                      </span>
+                                    </button>
+
+                                    {!isDayCollapsed && (
+                                      <div className="space-y-2 px-4 pb-3 pt-1 animate-fade-in">
+                                        {dayTasks.map(task => (
+                                          <TaskCard
+                                            key={task.id}
+                                            task={task}
+                                            onUpdate={handleUpdateTask}
+                                            onDelete={handleDeleteTask}
+                                            onEdit={t => setEditingTask(t)}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
                         </div>

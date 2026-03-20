@@ -98,11 +98,11 @@ export async function GET(req: Request) {
     }
 
     const notes = db.prepare(`
-      SELECT n.id, n.title, n.created_at
+      SELECT n.id, n.title, n.color, n.created_at
       FROM notes n
       ${noteWhere}
       ORDER BY n.created_at
-    `).all(...noteParams) as { id: string; title: string; created_at: string }[]
+    `).all(...noteParams) as { id: string; title: string; color: string; created_at: string }[]
 
     for (const n of notes) {
       items.push({
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
         type: 'note',
         id: n.id,
         title: n.title,
-        color: '#a855f7',
+        color: n.color || '#a855f7',
       })
     }
   }
