@@ -54,6 +54,7 @@ src/
 │   ├── TaskCard.tsx          # List view task card (read-only expanded view)
 │   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags with autocomplete)
 │   ├── RichEditor.tsx        # TipTap rich HTML editor (tables, images, colors, alignment)
+│   ├── ConfirmModal.tsx      # Reusable delete confirmation modal (replaces browser confirm())
 │   ├── Pagination.tsx        # Reusable pagination with page numbers, first/last/prev/next
 │   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
 │   ├── Sidebar.tsx           # Navigation sidebar
@@ -119,7 +120,8 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
 - Photo can be uploaded during registration (setup page) or from the sidebar (click avatar)
 - Admin can upload/remove photos when creating/editing users
 - Profile photo file is deleted when a user is deleted (along with task/note attachment files)
-- Session includes `profile_photo` field so the sidebar can render it without extra API calls
+- Session `profile_photo` is read fresh from the DB in the `session` callback (not from the stale JWT token) so it always reflects the latest upload
+- Sidebar calls `useSession().update()` after photo upload/remove to refresh the client-side session immediately
 
 ## Deployment
 
@@ -292,6 +294,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Note card color palette: 18 colors (Red, Rose, Pink, Fuchsia, Purple, Violet, Indigo, Blue, Sky, Cyan, Teal, Emerald, Green, Lime, Yellow, Amber, Orange) + None
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
 - All modals, popups, and dropdown menus close on ESC key and click-outside
+- All delete confirmations use the `ConfirmModal` component (`src/components/ConfirmModal.tsx`) — no vanilla `confirm()` dialogs; modal shows warning icon, title, message, Cancel/Delete buttons with backdrop blur
 - Date formatting uses European format (`en-GB` locale): "20 Mar 2026" (day month year); `formatDate()` and `formatDateTime()` in `src/lib/utils.ts`; date grouping keys in tasks/notes pages also use `en-GB`
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
 - Deleting a task or note also deletes all associated attachment files from disk (not just DB cascade)
