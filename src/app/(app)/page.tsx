@@ -248,15 +248,15 @@ function TasksPageInner() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-white">Tasks</h1>
           <p className="text-surface-700 text-sm mt-0.5">
             {pagination.total} task{pagination.total !== 1 ? 's' : ''} total
           </p>
         </div>
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
-          <Plus className="w-4 h-4" /> New Task
+        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2 flex-shrink-0">
+          <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Task</span><span className="sm:hidden">New</span>
         </button>
       </div>
 
@@ -329,7 +329,7 @@ function TasksPageInner() {
         </div>
 
         {showFilters && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-surface-300/20 animate-slide-down">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-surface-300/20 animate-slide-down">
             <select
               className="input-base text-sm"
               value={filterCategory}
@@ -364,7 +364,7 @@ function TasksPageInner() {
               onChange={e => setDateTo(e.target.value)}
               placeholder="To date"
             />
-            <div className="relative col-span-2" ref={tagDropdownRef}>
+            <div className="relative sm:col-span-2" ref={tagDropdownRef}>
               <button
                 type="button"
                 onClick={() => setShowTagDropdown(!showTagDropdown)}
