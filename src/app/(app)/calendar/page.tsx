@@ -5,11 +5,11 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, ChevronRight, Plus, Filter, Search,
   CalendarDays, CalendarRange, Calendar as CalendarIcon, Grid3X3,
-  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download, MapPin, Pencil,
+  CheckSquare, FileText, Loader2, X, Hash, Paperclip, Download, MapPin, Pencil, Link2,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import { TaskForm } from '@/components/TaskForm'
-import type { Category, Status, Tag, Task } from '@/types'
+import type { Category, Status, Tag, Task, Note } from '@/types'
 
 type ViewMode = 'day' | 'week' | 'month' | 'year'
 
@@ -68,6 +68,11 @@ export default function CalendarPage() {
   const [taskDetailLoading, setTaskDetailLoading] = useState(false)
   const taskDetailRef = useRef<HTMLDivElement>(null)
 
+  // Note detail modal
+  const [noteDetail, setNoteDetail] = useState<Note | null>(null)
+  const [noteDetailLoading, setNoteDetailLoading] = useState(false)
+  const noteDetailRef = useRef<HTMLDivElement>(null)
+
   // Task edit modal
   const [editingTask, setEditingTask] = useState<Task | null>(null)
 
@@ -111,19 +116,30 @@ export default function CalendarPage() {
     return () => document.removeEventListener('mousedown', handler)
   }, [taskDetail])
 
+  // Close note detail on outside click
+  useEffect(() => {
+    if (!noteDetail) return
+    const handler = (e: MouseEvent) => {
+      if (noteDetailRef.current && !noteDetailRef.current.contains(e.target as Node)) setNoteDetail(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [noteDetail])
+
   // ESC to close popups
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (editingTask) { setEditingTask(null); return }
         if (taskDetail) { setTaskDetail(null); return }
+        if (noteDetail) { setNoteDetail(null); return }
         if (dayPopup) { setDayPopup(null); return }
         if (showCreateMenu) { setShowCreateMenu(false); return }
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [editingTask, taskDetail, dayPopup, showCreateMenu])
+  }, [editingTask, taskDetail, noteDetail, dayPopup, showCreateMenu])
 
   // Calculate date range for current view
   const dateRange = useMemo(() => {
@@ -247,7 +263,17 @@ export default function CalendarPage() {
 
   const handleItemClick = async (item: CalendarItem) => {
     if (item.type === 'note') {
-      router.push(`/notes/${item.id}`)
+      setNoteDetailLoading(true)
+      setNoteDetail(null)
+      try {
+        const res = await fetch(`/api/notes/${item.id}`)
+        if (res.ok) {
+          setNoteDetail(await res.json())
+        }
+      } catch {
+        // ignore
+      }
+      setNoteDetailLoading(false)
       return
     }
     // Fetch full task details and show in modal
@@ -945,6 +971,123 @@ export default function CalendarPage() {
                 Created {formatDate(taskDetail.created_at)}
                 {taskDetail.updated_at && taskDetail.updated_at !== taskDetail.created_at && (
                   <span> &middot; Updated {formatDate(taskDetail.updated_at)}</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Note detail modal */}
+      {(noteDetail || noteDetailLoading) && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          {noteDetailLoading ? (
+            <div className="card p-8 animate-scale-in">
+              <Loader2 className="w-6 h-6 text-brand-400 animate-spin" />
+            </div>
+          ) : noteDetail && (
+            <div ref={noteDetailRef} className="card w-full max-w-lg p-6 animate-scale-in max-h-[85vh] overflow-y-auto"
+              style={noteDetail.color ? { borderTop: `3px solid ${noteDetail.color}` } : undefined}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-lg font-semibold text-white">{noteDetail.title}</h2>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => { setNoteDetail(null); router.push(`/notes/${noteDetail.id}`) }}
+                    className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 hover:text-brand-400 transition-colors"
+                    title="Edit note"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setNoteDetail(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 transition-colors">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {noteDetail.tags.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {noteDetail.tags.map(tag => (
+                      <span key={tag.id} className="badge gap-1" style={{
+                        backgroundColor: tag.color + '18',
+                        color: tag.color,
+                        border: `1px solid ${tag.color}25`,
+                      }}>
+                        <Hash className="w-3 h-3" />
+                        {tag.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {noteDetail.content && (
+                <div className="mb-4">
+                  <div
+                    className="text-sm text-surface-800 bg-surface-200/40 rounded-xl p-3 rich-editor-content prose-sm"
+                    dangerouslySetInnerHTML={{ __html: noteDetail.content }}
+                  />
+                </div>
+              )}
+
+              {noteDetail.linked_tasks.length > 0 && (
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-surface-800 mb-1.5 block">
+                    <Link2 className="w-3 h-3 inline mr-1" />
+                    Linked Tasks ({noteDetail.linked_tasks.length})
+                  </label>
+                  <div className="space-y-1.5">
+                    {noteDetail.linked_tasks.map(task => (
+                      <div key={task.id} className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm">
+                        <CheckSquare className={cn(
+                          'w-4 h-4 flex-shrink-0',
+                          task.status === 'completed' ? 'text-accent-green' : 'text-surface-700'
+                        )} />
+                        <span className={cn(
+                          'flex-1 truncate',
+                          task.status === 'completed' ? 'text-surface-700 line-through' : 'text-surface-900'
+                        )}>
+                          {task.title}
+                        </span>
+                        {task.progress > 0 && task.status !== 'completed' && (
+                          <span className="text-[10px] text-surface-700 tabular-nums">{task.progress}%</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {noteDetail.attachments.length > 0 && (
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-surface-800 mb-1.5 block">
+                    <Paperclip className="w-3 h-3 inline mr-1" />
+                    Attachments ({noteDetail.attachments.length})
+                  </label>
+                  <div className="space-y-1.5">
+                    {noteDetail.attachments.map(att => (
+                      <div key={att.id} className="flex items-center gap-2 bg-surface-200/40 rounded-lg p-2 text-sm">
+                        <FileText className="w-4 h-4 text-surface-700 flex-shrink-0" />
+                        <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
+                        <span className="text-xs text-surface-700">{formatFileSize(att.size)}</span>
+                        <a href={`/api/note-uploads/${att.id}`}
+                          className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                          title="Download">
+                          <Download className="w-3.5 h-3.5" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="text-[11px] text-surface-700 pt-2 border-t border-surface-300/20">
+                Created {formatDate(noteDetail.created_at)}
+                {noteDetail.updated_at && noteDetail.updated_at !== noteDetail.created_at && (
+                  <span> &middot; Updated {formatDate(noteDetail.updated_at)}</span>
                 )}
               </div>
             </div>

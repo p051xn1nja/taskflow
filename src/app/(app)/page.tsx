@@ -492,7 +492,7 @@ function TasksPageInner() {
                       const isMonthCollapsed = collapsedMonths.has(month)
                       const monthLabel = month.replace(/\s*\d{4}$/, '') // Show just "March" etc since year is parent
                       return (
-                        <div key={month} className="card overflow-hidden">
+                        <div key={month} className="card">
                           {/* Month header */}
                           <button
                             onClick={() => toggleMonth(month)}
