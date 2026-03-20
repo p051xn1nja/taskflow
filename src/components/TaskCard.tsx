@@ -149,7 +149,7 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
             <button
               onClick={() => onEdit(task)}
               className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"

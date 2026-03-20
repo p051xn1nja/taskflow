@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import {
   Plus, Loader2, Calendar, Paperclip, Hash, GripVertical,
   CircleDot, CheckCircle2, Pencil, Trash2, X, Check, MoreVertical,
-  ArrowUpDown, MapPin,
+  ArrowUpDown, MapPin, ChevronUp, ChevronDown,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { TaskForm } from '@/components/TaskForm'
@@ -18,6 +18,9 @@ function KanbanCard({
   onDragStart,
   onDragOver,
   onTouchDragStart,
+  onTouchDrop,
+  touchDragActive,
+  isBeingDragged,
   dropIndicator,
 }: {
   task: Task
@@ -26,6 +29,9 @@ function KanbanCard({
   onDragStart: (e: React.DragEvent, task: Task) => void
   onDragOver: (e: React.DragEvent, taskId: string) => void
   onTouchDragStart: (task: Task) => void
+  onTouchDrop: (targetTask: Task) => void
+  touchDragActive: boolean
+  isBeingDragged: boolean
   dropIndicator: 'above' | 'below' | null
 }) {
   const isDone = task.task_status?.is_completed ?? task.status === 'completed'
@@ -59,6 +65,12 @@ function KanbanCard({
     }
   }
 
+  const handleCardTap = () => {
+    if (touchDragActive && !isBeingDragged) {
+      onTouchDrop(task)
+    }
+  }
+
   return (
     <div className="relative">
       {dropIndicator === 'above' && (
@@ -71,6 +83,7 @@ function KanbanCard({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onClick={handleCardTap}
         className={cn(
           'group relative rounded-xl border bg-surface-100/80 backdrop-blur-sm p-3.5',
           'cursor-grab active:cursor-grabbing',
@@ -78,6 +91,8 @@ function KanbanCard({
           'transition-all duration-150 touch-manipulation',
           'border-surface-300/25',
           isDone && 'opacity-60',
+          isBeingDragged && 'ring-2 ring-brand-500/40 border-brand-500/30',
+          touchDragActive && !isBeingDragged && 'cursor-pointer hover:ring-2 hover:ring-brand-400/30',
         )}
       >
       <div className="absolute top-3 right-2 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -457,6 +472,35 @@ export default function BoardPage() {
     setTouchDragTask(null)
   }
 
+  // Mobile touch drag - tap a card to insert before it
+  const handleTouchDropOnCard = async (targetTask: Task) => {
+    if (!touchDragTask || targetTask.id === touchDragTask.id) return
+    const targetStatusId = targetTask.status_id || ''
+    const colTasks = columnTasks[targetStatusId] || []
+    const targetIdx = colTasks.findIndex(t => t.id === targetTask.id)
+    if (targetIdx >= 0) {
+      await moveTaskToStatus(touchDragTask, targetStatusId, targetIdx)
+    }
+    setTouchDragTask(null)
+  }
+
+  // Mobile touch drag - move up/down within column
+  const handleTouchMoveUpDown = async (direction: 'up' | 'down') => {
+    if (!touchDragTask) return
+    const colId = touchDragTask.status_id || ''
+    const colTasks = columnTasks[colId] || []
+    const currentIdx = colTasks.findIndex(t => t.id === touchDragTask.id)
+    if (currentIdx < 0) return
+    const newIdx = direction === 'up' ? currentIdx - 1 : currentIdx + 1
+    if (newIdx < 0 || newIdx >= colTasks.length) return
+    if (sortBy !== 'manual') setSortBy('manual')
+    const reordered = [...colTasks]
+    reordered.splice(currentIdx, 1)
+    reordered.splice(newIdx, 0, touchDragTask)
+    await saveColumnOrder(colId, reordered)
+    // Keep the task selected for continued reordering
+  }
+
   useEffect(() => {
     const handler = () => handleDragEnd()
     document.addEventListener('dragend', handler)
@@ -558,13 +602,42 @@ export default function BoardPage() {
             <p className="text-sm font-medium text-brand-400">
               Moving: <span className="text-white">{touchDragTask.title}</span>
             </p>
-            <button
-              onClick={() => setTouchDragTask(null)}
-              className="p-1 rounded-lg hover:bg-surface-300/30 text-surface-700"
-            >
-              <span className="text-xs text-surface-700">Cancel</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Move up/down within column */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handleTouchMoveUpDown('up')}
+                  disabled={(() => {
+                    const colTasks = columnTasks[touchDragTask.status_id || ''] || []
+                    return colTasks.findIndex(t => t.id === touchDragTask.id) <= 0
+                  })()}
+                  className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Move up"
+                >
+                  <ChevronUp className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handleTouchMoveUpDown('down')}
+                  disabled={(() => {
+                    const colTasks = columnTasks[touchDragTask.status_id || ''] || []
+                    const idx = colTasks.findIndex(t => t.id === touchDragTask.id)
+                    return idx < 0 || idx >= colTasks.length - 1
+                  })()}
+                  className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  title="Move down"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+              <button
+                onClick={() => setTouchDragTask(null)}
+                className="p-1 rounded-lg hover:bg-surface-300/30 text-surface-700"
+              >
+                <span className="text-xs text-surface-700">Cancel</span>
+              </button>
+            </div>
           </div>
+          <p className="text-[10px] text-surface-700 mb-2">Tap a card to insert before it, or use arrows to reorder</p>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {statuses.map(s => (
               <button
@@ -694,6 +767,9 @@ export default function BoardPage() {
                       onDragStart={handleDragStart}
                       onDragOver={handleCardDragOver}
                       onTouchDragStart={setTouchDragTask}
+                      onTouchDrop={handleTouchDropOnCard}
+                      touchDragActive={!!touchDragTask}
+                      isBeingDragged={touchDragTask?.id === task.id}
                       dropIndicator={dropTarget?.taskId === task.id ? dropTarget.position : null}
                     />
                   ))}
