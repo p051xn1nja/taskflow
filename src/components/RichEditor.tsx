@@ -20,7 +20,7 @@ import {
   Quote, Minus, ImagePlus, Link as LinkIcon, Unlink,
   Table as TableIcon, TableCellsMerge, Trash2,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  Highlighter, Palette, Undo2, Redo2,
+  Highlighter, Palette, Paintbrush, Undo2, Redo2,
   Plus, ArrowDown, ArrowUp, ArrowLeft, ArrowRight, X, Settings2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -482,11 +482,11 @@ export function RichEditor({ content, onChange, noteId, editable = true, noteCol
                   {noteColor ? (
                     <div className="w-3.5 h-3.5 rounded-full border border-surface-400/30" style={{ backgroundColor: noteColor }} />
                   ) : (
-                    <Palette className="w-3.5 h-3.5" />
+                    <Paintbrush className="w-3.5 h-3.5" />
                   )}
                 </ToolbarButton>
                 {showNoteColorPicker && (
-                  <div className="absolute top-full left-0 mt-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 min-w-[200px] animate-scale-in">
+                  <div className="absolute bottom-full left-0 mb-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 min-w-[200px] animate-scale-in">
                     <p className="text-[10px] font-semibold text-surface-700 uppercase tracking-wider mb-2 px-0.5">Card Color</p>
                     <div className="grid grid-cols-6 gap-2">
                       {NOTE_COLORS.map(c => (
