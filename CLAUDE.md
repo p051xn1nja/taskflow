@@ -56,7 +56,7 @@ src/
 ├── components/       # React components + UI library
 │   ├── TaskCard.tsx          # List view task card (read-only expanded view)
 │   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags with autocomplete)
-│   ├── RichEditor.tsx        # TipTap rich HTML editor (tables, images, colors, alignment)
+│   ├── RichEditor.tsx        # TipTap rich HTML editor (tables, images, colors, alignment); no overflow-hidden on root (toolbar dropdowns must not clip)
 │   ├── ConfirmModal.tsx      # Reusable delete confirmation modal (replaces browser confirm())
 │   ├── Pagination.tsx        # Reusable pagination with page numbers, first/last/prev/next
 │   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
@@ -305,6 +305,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Sidebar avatar shows profile photo if uploaded; clicking avatar opens menu to upload/change/remove photo; camera overlay on hover; clicking username/display name navigates to `/profile` for editing
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
+- RichEditor root has no `overflow-hidden` (toolbar dropdowns must not be clipped); rounded corners applied separately: `rounded-t-xl` on toolbar, `overflow-hidden rounded-b-xl` on `EditorContent`
 - Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing; card color picker (w-7 h-7 rounded-full, Paintbrush icon, opens upward) also available in editor toolbar
 - Note card color palette: 18 colors (Red, Rose, Pink, Fuchsia, Purple, Violet, Indigo, Blue, Sky, Cyan, Teal, Emerald, Green, Lime, Yellow, Amber, Orange) + None
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
