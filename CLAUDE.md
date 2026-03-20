@@ -253,6 +253,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
 - **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download), `DELETE /api/note-uploads/:id` (delete)
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
 - **Profile Photo**: `POST /api/profile-photo` (upload), `GET /api/profile-photo/:filename` (serve), `DELETE /api/profile-photo` (remove)
+- **Profile API**: `GET /api/profile` (current user data), `PATCH /api/profile` (update display_name, email, password with current_password verification)
 
 ## Testing
 
