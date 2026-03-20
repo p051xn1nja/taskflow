@@ -35,14 +35,37 @@ const HIGHLIGHT_COLORS = [
   '#c4b5fd80', '#fecdd380', '#fde68a80', '#d9f99d80',
 ]
 
+const NOTE_COLORS = [
+  { name: 'None', value: '' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Rose', value: '#f43f5e' },
+  { name: 'Pink', value: '#ec4899' },
+  { name: 'Fuchsia', value: '#d946ef' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Violet', value: '#8b5cf6' },
+  { name: 'Indigo', value: '#6366f1' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Sky', value: '#0ea5e9' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Emerald', value: '#10b981' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Orange', value: '#f97316' },
+]
+
 interface RichEditorProps {
   content: string
   onChange: (html: string) => void
   noteId?: string
   editable?: boolean
+  noteColor?: string
+  onNoteColorChange?: (color: string) => void
 }
 
-export function RichEditor({ content, onChange, noteId, editable = true }: RichEditorProps) {
+export function RichEditor({ content, onChange, noteId, editable = true, noteColor, onNoteColorChange }: RichEditorProps) {
   const [showTableModal, setShowTableModal] = useState(false)
   const [showTableAttrModal, setShowTableAttrModal] = useState(false)
   const [tableRows, setTableRows] = useState(3)
@@ -51,6 +74,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
   const [linkUrl, setLinkUrl] = useState('')
   const [showColorPicker, setShowColorPicker] = useState(false)
   const [showHighlightPicker, setShowHighlightPicker] = useState(false)
+  const [showNoteColorPicker, setShowNoteColorPicker] = useState(false)
   const [tableAttr, setTableAttr] = useState({
     borderWidth: '1',
     borderColor: '#4a5a8a',
@@ -60,6 +84,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
   const fileInputRef = useRef<HTMLInputElement>(null)
   const colorPickerRef = useRef<HTMLDivElement>(null)
   const highlightPickerRef = useRef<HTMLDivElement>(null)
+  const noteColorPickerRef = useRef<HTMLDivElement>(null)
   const linkInputRef = useRef<HTMLDivElement>(null)
   const tableModalRef = useRef<HTMLDivElement>(null)
   const tableAttrRef = useRef<HTMLDivElement>(null)
@@ -67,6 +92,7 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
   const closeAllMenus = useCallback(() => {
     setShowColorPicker(false)
     setShowHighlightPicker(false)
+    setShowNoteColorPicker(false)
     setShowLinkInput(false)
     setShowTableModal(false)
   }, [])
@@ -76,28 +102,29 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (showTableAttrModal) { setShowTableAttrModal(false); return }
-        if (showColorPicker || showHighlightPicker || showLinkInput || showTableModal) {
+        if (showColorPicker || showHighlightPicker || showNoteColorPicker || showLinkInput || showTableModal) {
           closeAllMenus()
         }
       }
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [showColorPicker, showHighlightPicker, showLinkInput, showTableModal, showTableAttrModal, closeAllMenus])
+  }, [showColorPicker, showHighlightPicker, showNoteColorPicker, showLinkInput, showTableModal, showTableAttrModal, closeAllMenus])
 
   // Click outside to close toolbar dropdowns
   useEffect(() => {
-    if (!showColorPicker && !showHighlightPicker && !showLinkInput && !showTableModal) return
+    if (!showColorPicker && !showHighlightPicker && !showNoteColorPicker && !showLinkInput && !showTableModal) return
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (showColorPicker && colorPickerRef.current && !colorPickerRef.current.contains(target)) setShowColorPicker(false)
       if (showHighlightPicker && highlightPickerRef.current && !highlightPickerRef.current.contains(target)) setShowHighlightPicker(false)
+      if (showNoteColorPicker && noteColorPickerRef.current && !noteColorPickerRef.current.contains(target)) setShowNoteColorPicker(false)
       if (showLinkInput && linkInputRef.current && !linkInputRef.current.contains(target)) setShowLinkInput(false)
       if (showTableModal && tableModalRef.current && !tableModalRef.current.contains(target)) setShowTableModal(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [showColorPicker, showHighlightPicker, showLinkInput, showTableModal])
+  }, [showColorPicker, showHighlightPicker, showNoteColorPicker, showLinkInput, showTableModal])
 
   // Click outside to close table attr modal
   useEffect(() => {
@@ -442,6 +469,48 @@ export function RichEditor({ content, onChange, noteId, editable = true }: RichE
               </div>
             )}
           </div>
+
+          {/* Card color (note accent) */}
+          {onNoteColorChange && (
+            <>
+              <Separator />
+              <div className="relative" ref={noteColorPickerRef}>
+                <ToolbarButton
+                  onClick={() => { setShowNoteColorPicker(!showNoteColorPicker); setShowColorPicker(false); setShowHighlightPicker(false) }}
+                  title="Card Color"
+                >
+                  {noteColor ? (
+                    <div className="w-3.5 h-3.5 rounded-full border border-surface-400/30" style={{ backgroundColor: noteColor }} />
+                  ) : (
+                    <Palette className="w-3.5 h-3.5" />
+                  )}
+                </ToolbarButton>
+                {showNoteColorPicker && (
+                  <div className="absolute top-full left-0 mt-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 min-w-[200px] animate-scale-in">
+                    <p className="text-[10px] font-semibold text-surface-700 uppercase tracking-wider mb-2 px-0.5">Card Color</p>
+                    <div className="grid grid-cols-6 gap-2">
+                      {NOTE_COLORS.map(c => (
+                        <button
+                          key={c.value || 'none'}
+                          type="button"
+                          onClick={() => { onNoteColorChange(c.value); setShowNoteColorPicker(false) }}
+                          className={cn(
+                            'w-7 h-7 rounded-full transition-all hover:scale-110 flex items-center justify-center',
+                            noteColor === c.value && 'ring-2 ring-offset-1 ring-brand-400 ring-offset-surface-100',
+                            !c.value && 'border border-surface-400/40',
+                          )}
+                          style={c.value ? { backgroundColor: c.value } : undefined}
+                          title={c.name}
+                        >
+                          {!c.value && <X className="w-3 h-3 text-surface-700" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Table operations (when inside table) */}
           {editor.isActive('table') && (

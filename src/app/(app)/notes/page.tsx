@@ -13,16 +13,22 @@ import type { Note, Tag } from '@/types'
 const NOTE_COLORS = [
   { name: 'None', value: '' },
   { name: 'Red', value: '#ef4444' },
-  { name: 'Orange', value: '#f97316' },
-  { name: 'Amber', value: '#f59e0b' },
-  { name: 'Yellow', value: '#eab308' },
-  { name: 'Lime', value: '#84cc16' },
-  { name: 'Green', value: '#22c55e' },
-  { name: 'Teal', value: '#14b8a6' },
-  { name: 'Cyan', value: '#06b6d4' },
-  { name: 'Blue', value: '#3b82f6' },
-  { name: 'Purple', value: '#a855f7' },
+  { name: 'Rose', value: '#f43f5e' },
   { name: 'Pink', value: '#ec4899' },
+  { name: 'Fuchsia', value: '#d946ef' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Violet', value: '#8b5cf6' },
+  { name: 'Indigo', value: '#6366f1' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Sky', value: '#0ea5e9' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Emerald', value: '#10b981' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Orange', value: '#f97316' },
 ]
 
 function stripHtml(html: string): string {
@@ -276,7 +282,7 @@ export default function NotesPage() {
                   <div
                     ref={colorPickerRef}
                     onClick={e => e.stopPropagation()}
-                    className="absolute right-0 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 p-2.5 min-w-[160px] animate-scale-in"
+                    className="absolute right-0 bottom-full mb-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 p-2.5 min-w-[200px] animate-scale-in"
                   >
                     <p className="text-[10px] font-semibold text-surface-700 uppercase tracking-wider mb-2 px-0.5">Card Color</p>
                     <div className="grid grid-cols-6 gap-2">
@@ -286,7 +292,7 @@ export default function NotesPage() {
                           type="button"
                           onClick={() => handleSetColor(note.id, c.value)}
                           className={cn(
-                            'w-6 h-6 rounded-full transition-all hover:scale-110 flex items-center justify-center',
+                            'w-7 h-7 rounded-full transition-all hover:scale-110 flex items-center justify-center',
                             noteColor === c.value && 'ring-2 ring-offset-1 ring-brand-400 ring-offset-surface-100',
                           )}
                           style={c.value ? { backgroundColor: c.value } : undefined}
