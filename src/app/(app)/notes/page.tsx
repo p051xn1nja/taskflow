@@ -329,7 +329,10 @@ export default function NotesPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+            <div className={cn(
+              'flex items-center gap-0.5 transition-opacity flex-shrink-0',
+              colorPickerNoteId === note.id ? 'opacity-100' : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
+            )}>
               <div className="relative">
                 <button
                   onClick={e => { e.stopPropagation(); setColorPickerNoteId(colorPickerNoteId === note.id ? null : note.id) }}

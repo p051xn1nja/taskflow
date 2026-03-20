@@ -13,7 +13,7 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
   const [appName, setAppName] = useState('TaskFlow')
 
   const fetchSettings = useCallback(() => {
-    fetch('/api/settings')
+    fetch('/api/settings', { cache: 'no-store' })
       .then(r => r.json())
       .then(data => {
         if (data.app_name) {
