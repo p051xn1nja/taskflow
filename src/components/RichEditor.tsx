@@ -263,10 +263,10 @@ export function RichEditor({ content, onChange, noteId, editable = true, noteCol
   const Separator = () => <div className="w-px h-5 bg-surface-400/20 mx-0.5" />
 
   return (
-    <div className="border border-surface-300/30 rounded-xl overflow-hidden bg-surface-100/60">
+    <div className="border border-surface-300/30 rounded-xl bg-surface-100/60">
       {/* Toolbar */}
       {editable && (
-        <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-surface-300/20 bg-surface-50/80">
+        <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-surface-300/20 bg-surface-50/80 rounded-t-xl">
           {/* Undo/Redo */}
           <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!editor.can().undo()} title="Undo">
             <Undo2 className="w-3.5 h-3.5" />
@@ -486,7 +486,7 @@ export function RichEditor({ content, onChange, noteId, editable = true, noteCol
                   )}
                 </ToolbarButton>
                 {showNoteColorPicker && (
-                  <div className="absolute top-full left-0 mt-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 min-w-[200px] animate-scale-in">
+                  <div className="absolute bottom-full left-0 mb-1 p-2.5 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 min-w-[200px] animate-scale-in">
                     <p className="text-[10px] font-semibold text-surface-700 uppercase tracking-wider mb-2 px-0.5">Card Color</p>
                     <div className="grid grid-cols-6 gap-2">
                       {NOTE_COLORS.map(c => (
@@ -545,7 +545,7 @@ export function RichEditor({ content, onChange, noteId, editable = true, noteCol
       )}
 
       {/* Editor */}
-      <EditorContent editor={editor} className="min-h-[300px]" />
+      <EditorContent editor={editor} className="min-h-[300px] overflow-hidden rounded-b-xl" />
 
       {/* Table attributes modal */}
       {showTableAttrModal && (
