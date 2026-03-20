@@ -153,11 +153,11 @@ Notes have their own content model alongside tasks:
 - **Notes** (`/notes`): List view with search, tag filters, pagination — same year → month → day accordion layout as tasks
   - Notes grouped by year → month → day (by `updated_at`) with collapsible sections; current year/month/day expanded by default
   - Each note card shows title, content preview (HTML stripped), tags, linked task count, attachment count
-  - Color picker dropdown (palette icon) on each card to set a card accent color (12 presets); color shown as colored left border
+  - Color picker dropdown (palette icon) on each card to set a card accent color (18 presets); opens upward to avoid clipping; color shown as colored left border
   - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
   - Click to open full note editor
 - **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
-  - Color picker in header toolbar to set note card accent color (same 12 presets as notes list)
+  - Color picker in header toolbar and in the RichEditor toolbar to set note card accent color (same 18 presets as notes list)
   - TipTap rich HTML editor: bold, italic, underline, strikethrough, code, headings (H1-H3)
   - Text colors (12 presets, w-8 h-8 buttons), highlight colors (8 presets, w-8 h-8 buttons), text alignment (left, center, right, justify)
   - Bullet lists, ordered lists, blockquotes, horizontal rules, code blocks
@@ -261,7 +261,8 @@ Managed via Admin → Settings (`platform_settings` table):
 - Sidebar order: Tasks, Notes, Board, Calendar, Categories, Tags, Statuses; collapsed mode stacks avatar and logout vertically (flex-col) for centered alignment
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
-- Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing
+- Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing; card color picker (w-7 h-7 rounded-full) also available in editor toolbar
+- Note card color palette: 18 colors (Red, Rose, Pink, Fuchsia, Purple, Violet, Indigo, Blue, Sky, Cyan, Teal, Emerald, Green, Lime, Yellow, Amber, Orange) + None
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
 - All modals, popups, and dropdown menus close on ESC key and click-outside
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
