@@ -48,6 +48,7 @@ src/
 │   │   ├── note-uploads/     # Note file upload, download, delete
 │   │   ├── editor-upload/    # Rich editor inline image upload + serve
 │   │   ├── profile/          # Self-service profile update (display name, email, password)
+│   │   ├── settings/         # Public settings endpoint (app_name, no auth required)
 │   │   ├── admin/            # Admin: users CRUD, platform settings
 │   │   └── auth/             # NextAuth + initial setup
 │   ├── icon.tsx      # 32x32 PNG favicon (generated at build time)
@@ -60,8 +61,9 @@ src/
 │   ├── Pagination.tsx        # Reusable pagination with page numbers, first/last/prev/next
 │   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
 │   ├── Sidebar.tsx           # Navigation sidebar
-│   └── Providers.tsx         # NextAuth session provider
-├── lib/              # Core: db.ts (schema), auth.ts, helpers
+│   ├── Footer.tsx            # Dynamic footer with app name from settings
+│   └── Providers.tsx         # NextAuth session + AppSettings providers
+├── lib/              # Core: db.ts (schema), auth.ts, helpers, settings-context.tsx
 └── types/            # TypeScript type definitions
 data/                 # SQLite DB + uploads (gitignored, mounted volume)
 tests/
@@ -184,7 +186,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
   - Click opens a read-only detail modal (title, tags, HTML content, linked tasks, attachments, timestamps); Edit button navigates to full editor
 - **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
-  - Color picker in header toolbar and in the RichEditor toolbar to set note card accent color (same 18 presets as notes list)
+  - Color picker in header toolbar and in the RichEditor toolbar (Paintbrush icon, opens upward) to set note card accent color (same 18 presets as notes list)
   - TipTap rich HTML editor: bold, italic, underline, strikethrough, code, headings (H1-H3)
   - Text colors (12 presets, w-8 h-8 buttons), highlight colors (8 presets, w-8 h-8 buttons), text alignment (left, center, right, justify)
   - Bullet lists, ordered lists, blockquotes, horizontal rules, code blocks
@@ -195,7 +197,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Tag management with autocomplete from master tags
   - Task linking: search and link/unlink tasks to notes
   - File attachments: upload (drag-and-drop or browse), download, delete — same limits as tasks
-  - Auto-save with 2s debounce + manual save button
+  - Auto-save with 2s debounce + manual save button (Save redirects back to `/notes` list)
 - **Calendar** (`/calendar`): Visual calendar view of tasks and notes
   - Four view modes: Day, Week, Month, Year — toggle via toolbar buttons
   - **Monthly**: Classic 7-column grid, items shown as colored pills (category color), "+N more" overflow
@@ -234,8 +236,9 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Session refreshed via `update()` after profile or photo changes
   - Navigated to by clicking the username in the sidebar
 - **Admin Panel** (`/admin`): Admin-only dashboard
-  - **Users** (`/admin/users`): Manage users — activate/deactivate, approve pending registrations, delete
-  - **Settings** (`/admin/settings`): Platform-wide settings (registration, approval, limits)
+  - **Users** (`/admin/users`): Manage users — view profile (eye icon), edit (pencil icon), activate/deactivate, approve pending registrations, delete
+    - View profile modal: read-only display of avatar, name, username, role, email, status, task count, join date; Edit User button transitions to edit form
+  - **Settings** (`/admin/settings`): Platform-wide settings (app name, registration, approval, limits); saving refreshes app name globally via `refreshSettings()`
 
 ## File Uploads
 
@@ -254,6 +257,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
 - **Profile Photo**: `POST /api/profile-photo` (upload), `GET /api/profile-photo/:filename` (serve), `DELETE /api/profile-photo` (remove)
 - **Profile API**: `GET /api/profile` (current user data), `PATCH /api/profile` (update display_name, email, password with current_password verification)
+- **Public Settings API**: `GET /api/settings` — returns `{ app_name }` (no auth required, used by AppSettingsProvider)
 
 ## Testing
 
@@ -274,7 +278,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
 
 Managed via Admin → Settings (`platform_settings` table):
 
-- `app_name` — Display name for the app
+- `app_name` — Display name for the app (dynamic: used in sidebar header, login page, browser tab title, footer via `AppSettingsProvider` context)
 - `max_tasks_per_user` — Max tasks per user (default: 1000)
 - `max_file_size_mb` — Legacy per-file limit; total enforcement is 50 MB per task
 - `max_categories_per_user` — Max categories per user (default: 50)
@@ -300,7 +304,7 @@ Managed via Admin → Settings (`platform_settings` table):
 - Sidebar avatar shows profile photo if uploaded; clicking avatar opens menu to upload/change/remove photo; camera overlay on hover; clicking username/display name navigates to `/profile` for editing
 - Tasks have `location`, `start_date`, and `due_date` fields; location is displayed on list cards, board cards, and calendar detail modal; calendar renders multi-day bars for range tasks
 - Color pickers in tags/statuses/categories use grid-cols-6 gap-3 layout with w-10 h-10 buttons
-- Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing; card color picker (w-7 h-7 rounded-full) also available in editor toolbar
+- Color pickers in the rich text editor use w-8 h-8 buttons with gap-2 spacing; card color picker (w-7 h-7 rounded-full, Paintbrush icon, opens upward) also available in editor toolbar
 - Note card color palette: 18 colors (Red, Rose, Pink, Fuchsia, Purple, Violet, Indigo, Blue, Sky, Cyan, Teal, Emerald, Green, Lime, Yellow, Amber, Orange) + None
 - Pagination uses a shared `Pagination` component (`src/components/Pagination.tsx`) with numbered pages, first/last/prev/next arrows; used on Tasks and Notes pages
 - All modals, popups, and dropdown menus close on ESC key and click-outside
@@ -308,4 +312,4 @@ Managed via Admin → Settings (`platform_settings` table):
 - Date formatting uses European format (`en-GB` locale): "20 Mar 2026" (day month year); `formatDate()` and `formatDateTime()` in `src/lib/utils.ts`; date grouping keys in tasks/notes pages also use `en-GB`
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
 - Deleting a task or note also deletes all associated attachment files from disk (not just DB cascade)
-- Footer with build info ("TaskFlow build 20260320-21-stable by p051xn1nja") shown on all pages via app layout and login page
+- Footer with build info (dynamic app name + "build 20260320-21-stable by p051xn1nja") shown on all pages via `Footer` component (app layout) and login page; app name sourced from `AppSettingsProvider`
