@@ -182,6 +182,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Search & Filters card uses `relative z-10` to ensure dropdowns render above the collapsible accordion sections below
   - Notes grouped by year → month → day (by `updated_at`) with collapsible sections; current year/month/day expanded by default
   - Each note card shows title, category badge, content preview (HTML stripped), tags, linked task count, attachment count
+  - Action buttons (color picker, edit, delete) use `opacity-100 lg:opacity-0 lg:group-hover:opacity-100` — always visible on mobile, hover-reveal on desktop; forced `opacity-100` when color picker is open (prevents vanishing when mouse moves to the upward-opening picker)
   - Color picker dropdown (palette icon) on each card to set a card accent color (18 presets); opens upward to avoid clipping; color shown as colored left border
   - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
   - Click opens a read-only detail modal (title, tags, HTML content, linked tasks, attachments, timestamps); Edit button navigates to full editor
@@ -257,7 +258,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
 - **Profile Photo**: `POST /api/profile-photo` (upload), `GET /api/profile-photo/:filename` (serve), `DELETE /api/profile-photo` (remove)
 - **Profile API**: `GET /api/profile` (current user data), `PATCH /api/profile` (update display_name, email, password with current_password verification)
-- **Public Settings API**: `GET /api/settings` — returns `{ app_name }` (no auth required, used by AppSettingsProvider)
+- **Public Settings API**: `GET /api/settings` — returns `{ app_name }` (no auth required, `force-dynamic`, used by AppSettingsProvider with `cache: 'no-store'`)
 
 ## Testing
 
