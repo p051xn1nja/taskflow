@@ -136,6 +136,7 @@ Notes have their own content model alongside tasks:
   - Progress bar displayed on each card; editing progress is done via the edit modal
   - Checkbox toggles completion: sets status to completed (with `status_id` auto-resolved), progress=100, title struck through
   - Location, start date, and due date shown on each card
+  - Action buttons (edit/delete) use `opacity-100 lg:opacity-0 lg:group-hover:opacity-100` — always visible on mobile, hover-reveal on desktop
 - **Board** (`/board`): Kanban board with dynamic user-defined columns
   - Columns driven by the user's `statuses` table, ordered by `position`
   - Inline column management: three-dot menu on each column header to rename or delete statuses directly
@@ -146,7 +147,8 @@ Notes have their own content model alongside tasks:
   - **Cross-column moves**: drag cards between columns to change status; drop on a specific card to insert at that position
   - **Sort modes**: "Manual (drag to reorder)" uses persisted `board_position`; other options: created date, due date, progress, title
   - Dragging to reorder auto-switches sort to "Manual" mode; `board_position` persisted via `POST /api/tasks/reorder`
-  - Mobile: long-press a card to select it, then tap a status button to move it
+  - Mobile: long-press a card to select it, then tap a status button to move it (cross-column), use up/down arrows to reorder within column, or tap another card to insert before it
+  - Mobile drag banner shows selected card with ring highlight, up/down arrows, helper text, and status column buttons
   - Moving cards updates `status_id` and `progress` via `PATCH /api/tasks/:id`
   - Dragging to a completed-status column sets progress=100; to default sets progress=0
   - Drag-over highlight uses Tailwind ring/border classes (inline styles cleared during drag for proper visibility)
