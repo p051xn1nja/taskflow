@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Save, Loader2, Settings, Info } from 'lucide-react'
+import { useAppSettings } from '@/lib/settings-context'
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -12,6 +13,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const { refreshSettings } = useAppSettings()
 
   useEffect(() => {
     if (session?.user?.role !== 'admin') { router.push('/'); return }
@@ -34,6 +36,7 @@ export default function SettingsPage() {
     })
     setSaving(false)
     setSaved(true)
+    refreshSettings()
     setTimeout(() => setSaved(false), 2000)
   }
 

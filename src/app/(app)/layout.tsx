@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/Sidebar'
+import { Footer } from '@/components/Footer'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,9 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pt-20 lg:pt-8 flex-1 w-full">
           {children}
         </div>
-        <footer className="text-center py-4 text-[11px] text-surface-600 tracking-wide">
-          TaskFlow build 20260320-21-stable by p051xn1nja
-        </footer>
+        <Footer />
       </main>
     </div>
   )

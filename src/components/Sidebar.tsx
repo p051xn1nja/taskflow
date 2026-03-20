@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { useState, useRef } from 'react'
 import { cn } from '@/lib/utils'
+import { useAppSettings } from '@/lib/settings-context'
 
 const navItems = [
   { href: '/', icon: CheckSquare, label: 'Tasks' },
@@ -52,6 +53,7 @@ export function Sidebar() {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const { appName } = useAppSettings()
   const isAdmin = session?.user?.role === 'admin'
 
   // Derive photo URL from session
@@ -123,7 +125,7 @@ export function Sidebar() {
               <div className="w-8 h-8 rounded-lg bg-brand-600/20 border border-brand-500/30 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-brand-400" />
               </div>
-              <span className="font-bold text-lg text-white tracking-tight">TaskFlow</span>
+              <span className="font-bold text-lg text-white tracking-tight">{appName}</span>
             </Link>
           )}
           <button

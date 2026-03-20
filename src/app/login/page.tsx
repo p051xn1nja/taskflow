@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { LogIn, UserPlus, Zap, Camera, X } from 'lucide-react'
+import { useAppSettings } from '@/lib/settings-context'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function LoginPage() {
     password: '',
     display_name: '',
   })
+  const { appName } = useAppSettings()
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -108,7 +110,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-600/20 border border-brand-500/30 mb-4 glow-brand">
             <Zap className="w-8 h-8 text-brand-400" />
           </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">TaskFlow</h1>
+          <h1 className="text-3xl font-bold text-white tracking-tight">{appName}</h1>
           <p className="text-surface-800 mt-1">
             {isSetup && !hasUsers
               ? 'Create your admin account to get started'
@@ -250,7 +252,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-surface-600 text-[11px] mt-6 tracking-wide">
-          TaskFlow build 20260320-21-stable by p051xn1nja
+          {appName} build 20260320-21-stable by p051xn1nja
         </p>
       </div>
     </div>
