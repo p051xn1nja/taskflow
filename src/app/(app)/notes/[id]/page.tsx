@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { cn, formatFileSize, formatDate } from '@/lib/utils'
 import { RichEditor } from '@/components/RichEditor'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import type { Note, Tag, NoteAttachment, LinkedTask, Category } from '@/types'
 
 const ALLOWED_EXTENSIONS = new Set([
@@ -80,6 +81,7 @@ export default function NoteEditorPage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [categoryId, setCategoryId] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -271,9 +273,13 @@ export default function NoteEditorPage() {
     await saveNote()
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Delete this note permanently?')) return
+  const handleDelete = () => {
+    setShowConfirmDelete(true)
+  }
+
+  const executeDelete = async () => {
     await fetch(`/api/notes/${noteId}`, { method: 'DELETE' })
+    setShowConfirmDelete(false)
     router.push('/notes')
   }
 
@@ -630,6 +636,13 @@ export default function NoteEditorPage() {
           </button>
         )}
       </div>
+      <ConfirmModal
+        open={showConfirmDelete}
+        title="Delete Note"
+        message="This note and all its attachments will be permanently deleted."
+        onConfirm={executeDelete}
+        onCancel={() => setShowConfirmDelete(false)}
+      />
     </div>
   )
 }

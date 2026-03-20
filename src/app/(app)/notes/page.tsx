@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import type { Note, Tag, Category } from '@/types'
 
 const NOTE_COLORS = [
@@ -54,6 +55,9 @@ export default function NotesPage() {
   const [tagFilterSearch, setTagFilterSearch] = useState('')
   const [showTagDropdown, setShowTagDropdown] = useState(false)
   const tagDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Confirm delete modal
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   // Color picker state
   const [colorPickerNoteId, setColorPickerNoteId] = useState<string | null>(null)
@@ -173,8 +177,13 @@ export default function NotesPage() {
   }
 
   const handleDeleteNote = async (id: string) => {
-    if (!confirm('Delete this note?')) return
-    await fetch(`/api/notes/${id}`, { method: 'DELETE' })
+    setConfirmDelete(id)
+  }
+
+  const executeDeleteNote = async () => {
+    if (!confirmDelete) return
+    await fetch(`/api/notes/${confirmDelete}`, { method: 'DELETE' })
+    setConfirmDelete(null)
     fetchNotes(pagination.page)
   }
 
@@ -839,6 +848,13 @@ export default function NotesPage() {
           )}
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete Note"
+        message="This note and all its attachments will be permanently deleted."
+        onConfirm={executeDeleteNote}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

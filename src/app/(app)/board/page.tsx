@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { TaskForm } from '@/components/TaskForm'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import type { Task, Category, Status } from '@/types'
 
 function KanbanCard({
@@ -217,6 +218,10 @@ export default function BoardPage() {
   // Sort state
   const [sortBy, setSortBy] = useState<string>('created_desc')
 
+  // Confirm delete modal
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState<string | null>(null)
+  const [confirmDeleteColumn, setConfirmDeleteColumn] = useState<string | null>(null)
+
   // Column menu state
   const [columnMenu, setColumnMenu] = useState<string | null>(null)
   const [renamingColumn, setRenamingColumn] = useState<string | null>(null)
@@ -251,8 +256,13 @@ export default function BoardPage() {
   const handleDeleteColumn = async (statusId: string) => {
     const s = statuses.find(st => st.id === statusId)
     if (s?.is_default) { alert('Cannot delete the default status.'); return }
-    if (!confirm('Delete this status? Tasks will be moved to the default status.')) return
-    await fetch(`/api/statuses/${statusId}`, { method: 'DELETE' })
+    setConfirmDeleteColumn(statusId)
+  }
+
+  const executeDeleteColumn = async () => {
+    if (!confirmDeleteColumn) return
+    await fetch(`/api/statuses/${confirmDeleteColumn}`, { method: 'DELETE' })
+    setConfirmDeleteColumn(null)
     setColumnMenu(null)
     fetchAll()
   }
@@ -282,8 +292,13 @@ export default function BoardPage() {
   }
 
   const handleDeleteTask = async (id: string) => {
-    if (!confirm('Delete this task?')) return
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    setConfirmDeleteTask(id)
+  }
+
+  const executeDeleteTask = async () => {
+    if (!confirmDeleteTask) return
+    await fetch(`/api/tasks/${confirmDeleteTask}`, { method: 'DELETE' })
+    setConfirmDeleteTask(null)
     fetchAll()
   }
 
@@ -799,6 +814,20 @@ export default function BoardPage() {
           onCancel={() => setEditingTask(null)} onDeleteAttachment={handleDeleteAttachment}
           onFilesUploaded={() => fetchAll()} />
       )}
+      <ConfirmModal
+        open={!!confirmDeleteTask}
+        title="Delete Task"
+        message="This task and all its attachments will be permanently deleted."
+        onConfirm={executeDeleteTask}
+        onCancel={() => setConfirmDeleteTask(null)}
+      />
+      <ConfirmModal
+        open={!!confirmDeleteColumn}
+        title="Delete Status"
+        message="Tasks in this status will be moved to the default status."
+        onConfirm={executeDeleteColumn}
+        onCancel={() => setConfirmDeleteColumn(null)}
+      />
     </div>
   )
 }

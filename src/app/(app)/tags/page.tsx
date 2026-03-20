@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Hash, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import type { Tag } from '@/types'
 
 const PRESET_COLORS = [
@@ -18,6 +19,7 @@ export default function TagsPage() {
   const [editing, setEditing] = useState<Tag | null>(null)
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3b82f6')
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -65,8 +67,13 @@ export default function TagsPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this tag? It will be removed from all tasks and notes.')) return
-    await fetch(`/api/tags/${id}`, { method: 'DELETE' })
+    setConfirmDelete(id)
+  }
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return
+    await fetch(`/api/tags/${confirmDelete}`, { method: 'DELETE' })
+    setConfirmDelete(null)
     fetchTags()
   }
 
@@ -243,6 +250,13 @@ export default function TagsPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete Tag"
+        message="This tag will be removed from all tasks and notes."
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

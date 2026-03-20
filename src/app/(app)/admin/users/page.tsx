@@ -8,6 +8,7 @@ import {
   UserCheck, UserX, Lock, Camera,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import { useRef } from 'react'
 
 interface UserData {
@@ -33,6 +34,7 @@ export default function UsersPage() {
   const [form, setForm] = useState({ username: '', email: '', password: '', display_name: '', role: 'user' })
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -101,8 +103,13 @@ export default function UsersPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this user and all their data?')) return
-    await fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+    setConfirmDelete(id)
+  }
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return
+    await fetch(`/api/admin/users/${confirmDelete}`, { method: 'DELETE' })
+    setConfirmDelete(null)
     fetchUsers()
   }
 
@@ -372,6 +379,13 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete User"
+        message="This user and all their tasks, notes, and files will be permanently deleted."
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

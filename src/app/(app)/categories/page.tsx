@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Plus, Pencil, Trash2, Tag, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import type { Category } from '@/types'
 
 const PRESET_COLORS = [
@@ -18,6 +19,7 @@ export default function CategoriesPage() {
   const [editing, setEditing] = useState<Category | null>(null)
   const [name, setName] = useState('')
   const [color, setColor] = useState('#3b82f6')
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -65,8 +67,13 @@ export default function CategoriesPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this category? Tasks and notes will be uncategorized.')) return
-    await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+    setConfirmDelete(id)
+  }
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return
+    await fetch(`/api/categories/${confirmDelete}`, { method: 'DELETE' })
+    setConfirmDelete(null)
     fetchCategories()
   }
 
@@ -231,6 +238,13 @@ export default function CategoriesPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete Category"
+        message="Tasks and notes in this category will become uncategorized."
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

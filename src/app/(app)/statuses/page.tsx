@@ -6,6 +6,7 @@ import {
   CircleDot, Check, Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import type { Status } from '@/types'
 
 const PRESET_COLORS = [
@@ -23,6 +24,7 @@ export default function StatusesPage() {
   const [isCompleted, setIsCompleted] = useState(false)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const formRef = useRef<HTMLDivElement>(null)
 
@@ -72,8 +74,13 @@ export default function StatusesPage() {
   const handleDelete = async (id: string) => {
     const s = statuses.find(st => st.id === id)
     if (s?.is_default) { alert('Cannot delete the default status.'); return }
-    if (!confirm('Delete this status? Tasks in this status will be moved to the default status.')) return
-    await fetch(`/api/statuses/${id}`, { method: 'DELETE' })
+    setConfirmDelete(id)
+  }
+
+  const executeDelete = async () => {
+    if (!confirmDelete) return
+    await fetch(`/api/statuses/${confirmDelete}`, { method: 'DELETE' })
+    setConfirmDelete(null)
     fetchStatuses()
   }
 
@@ -265,6 +272,13 @@ export default function StatusesPage() {
           </div>
         </div>
       )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete Status"
+        message="Tasks in this status will be moved to the default status."
+        onConfirm={executeDelete}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }

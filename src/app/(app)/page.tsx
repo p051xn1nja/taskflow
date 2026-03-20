@@ -10,6 +10,7 @@ import {
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
 import { Pagination } from '@/components/Pagination'
+import { ConfirmModal } from '@/components/ConfirmModal'
 import { cn, groupBy } from '@/lib/utils'
 import type { Task, Category, Status, Tag as TagType } from '@/types'
 
@@ -66,6 +67,9 @@ function TasksPageInner() {
   const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set())
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set())
+
+  // Confirm delete modal
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   const fetchTasks = useCallback(async (page = 1) => {
     setLoading(true)
@@ -167,8 +171,13 @@ function TasksPageInner() {
   }
 
   const handleDeleteTask = async (id: string) => {
-    if (!confirm('Delete this task?')) return
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    setConfirmDelete(id)
+  }
+
+  const executeDeleteTask = async () => {
+    if (!confirmDelete) return
+    await fetch(`/api/tasks/${confirmDelete}`, { method: 'DELETE' })
+    setConfirmDelete(null)
     fetchTasks(pagination.page)
   }
 
@@ -602,6 +611,13 @@ function TasksPageInner() {
           onFilesUploaded={() => fetchTasks(pagination.page)}
         />
       )}
+      <ConfirmModal
+        open={!!confirmDelete}
+        title="Delete Task"
+        message="This task and all its attachments will be permanently deleted."
+        onConfirm={executeDeleteTask}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   )
 }
