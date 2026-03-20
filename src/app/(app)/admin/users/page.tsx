@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Pencil, Trash2, Shield, User, X, Loader2,
-  UserCheck, UserX, Lock, Camera,
+  UserCheck, UserX, Lock, Camera, Eye,
 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import { ConfirmModal } from '@/components/ConfirmModal'
@@ -35,12 +35,18 @@ export default function UsersPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [viewingUser, setViewingUser] = useState<UserData | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (session?.user?.role !== 'admin') { router.push('/'); return }
     fetchUsers()
   }, [session, router])
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setViewingUser(null) }
+    if (viewingUser) { document.addEventListener('keydown', handleEsc); return () => document.removeEventListener('keydown', handleEsc) }
+  }, [viewingUser])
 
   const fetchUsers = async () => {
     const res = await fetch('/api/admin/users')
@@ -221,6 +227,13 @@ export default function UsersPage() {
                     {user.is_active ? <UserX className="w-4 h-4" /> : <UserCheck className="w-4 h-4" />}
                   </button>
                   <button
+                    onClick={() => setViewingUser(user)}
+                    className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                    title="View Profile"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={() => startEdit(user)}
                     className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
                     title="Edit"
@@ -379,6 +392,82 @@ export default function UsersPage() {
           </div>
         </div>
       )}
+      {/* View Profile modal */}
+      {viewingUser && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setViewingUser(null)}>
+          <div className="card w-full max-w-md p-6 animate-scale-in" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-white">User Profile</h2>
+              <button onClick={() => setViewingUser(null)} className="p-1.5 rounded-lg hover:bg-surface-300/30 text-surface-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-col items-center gap-3 mb-6">
+              <div className={cn(
+                'w-20 h-20 rounded-xl flex items-center justify-center overflow-hidden',
+                viewingUser.role === 'admin' ? 'bg-accent-purple/15' : 'bg-brand-600/15'
+              )}>
+                {viewingUser.profile_photo ? (
+                  <img src={`/api/profile-photo/${viewingUser.profile_photo}`} alt={viewingUser.display_name} className="w-full h-full object-cover" />
+                ) : viewingUser.role === 'admin' ? (
+                  <Shield className="w-10 h-10 text-accent-purple" />
+                ) : (
+                  <User className="w-10 h-10 text-brand-400" />
+                )}
+              </div>
+              <div className="text-center">
+                <h3 className="text-lg font-semibold text-white">{viewingUser.display_name}</h3>
+                <p className="text-sm text-surface-700">@{viewingUser.username}</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between py-2 border-b border-surface-300/20">
+                <span className="text-sm text-surface-700">Role</span>
+                <span className={cn(
+                  'badge text-xs',
+                  viewingUser.role === 'admin'
+                    ? 'bg-accent-purple/15 text-accent-purple border border-accent-purple/20'
+                    : 'bg-brand-600/15 text-brand-400 border border-brand-500/20'
+                )}>
+                  {viewingUser.role}
+                </span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-surface-300/20">
+                <span className="text-sm text-surface-700">Email</span>
+                <span className="text-sm text-white">{viewingUser.email}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-surface-300/20">
+                <span className="text-sm text-surface-700">Status</span>
+                {viewingUser.pending_approval ? (
+                  <span className="badge text-xs bg-accent-amber/15 text-accent-amber border border-accent-amber/20">Pending Approval</span>
+                ) : viewingUser.is_active ? (
+                  <span className="badge text-xs bg-accent-green/15 text-accent-green border border-accent-green/20">Active</span>
+                ) : (
+                  <span className="badge text-xs bg-accent-red/15 text-accent-red border border-accent-red/20">Inactive</span>
+                )}
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-surface-300/20">
+                <span className="text-sm text-surface-700">Tasks</span>
+                <span className="text-sm text-white">{viewingUser.task_count}</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm text-surface-700">Joined</span>
+                <span className="text-sm text-white">{formatDate(viewingUser.created_at)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-5">
+              <button onClick={() => setViewingUser(null)} className="btn-secondary flex-1">Close</button>
+              <button onClick={() => { setViewingUser(null); startEdit(viewingUser) }} className="btn-primary flex-1 flex items-center justify-center gap-2">
+                <Pencil className="w-3.5 h-3.5" /> Edit User
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmModal
         open={!!confirmDelete}
         title="Delete User"
