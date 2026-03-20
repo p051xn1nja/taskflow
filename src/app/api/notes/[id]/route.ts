@@ -63,6 +63,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     updates.push('content = ?')
     values.push(body.content || '')
   }
+  if ('color' in body) {
+    updates.push('color = ?')
+    values.push(body.color || '')
+  }
 
   if (updates.length > 0) {
     updates.push("updated_at = datetime('now')")

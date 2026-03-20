@@ -100,7 +100,7 @@ Tags are managed via a master `tags` table with `(id, user_id, name, color)`. Ta
 ### Notes System
 
 Notes have their own content model alongside tasks:
-- `notes` table: `(id, user_id, title, content, created_at, updated_at)` — content is HTML from the rich editor
+- `notes` table: `(id, user_id, title, content, color, created_at, updated_at)` — content is HTML from the rich editor; color is optional hex for card accent
 - `note_tags`: Links notes to tags
 - `note_tasks`: Links notes to tasks (many-to-many)
 - `note_attachments`: File attachments for notes (same schema as `attachments`)
@@ -151,8 +151,11 @@ Notes have their own content model alongside tasks:
   - Tag names displayed as colored badges on kanban cards
 - **Notes** (`/notes`): Card grid view with search, tag filters, pagination
   - Each card shows title, content preview (HTML stripped), tags, linked task count, attachment count
+  - Color picker dropdown (palette icon) on each card to set a card accent color (12 presets); color shown as colored top border
+  - Tag filter is a searchable dropdown/combobox — type to filter existing tags, click to select
   - Click to open full note editor
 - **Note Editor** (`/notes/:id`): Full-page rich editor with auto-save
+  - Color picker in header toolbar to set note card accent color (same 12 presets as notes list)
   - TipTap rich HTML editor: bold, italic, underline, strikethrough, code, headings (H1-H3)
   - Text colors (12 presets, w-8 h-8 buttons), highlight colors (8 presets, w-8 h-8 buttons), text alignment (left, center, right, justify)
   - Bullet lists, ordered lists, blockquotes, horizontal rules, code blocks

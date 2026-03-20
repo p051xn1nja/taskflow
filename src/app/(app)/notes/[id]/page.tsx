@@ -6,7 +6,7 @@ import {
   ArrowLeft, Save, Trash2, Plus, X, Hash, Link2,
   Upload, FileText, Download, AlertCircle, Loader2,
   Image as ImageIcon, FileArchive, FileSpreadsheet,
-  CheckSquare, Search,
+  CheckSquare, Search, Palette,
 } from 'lucide-react'
 import { cn, formatFileSize, formatDate } from '@/lib/utils'
 import { RichEditor } from '@/components/RichEditor'
@@ -23,6 +23,21 @@ const ARCHIVE_EXTENSIONS = new Set(['zip', 'rar', '7z', 'tar', 'gz'])
 const SPREADSHEET_EXTENSIONS = new Set(['xlsx', 'xls', 'csv'])
 const MAX_FILES = 10
 const MAX_TOTAL_SIZE = 50 * 1024 * 1024
+
+const NOTE_COLORS = [
+  { name: 'None', value: '' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Pink', value: '#ec4899' },
+]
 
 function getFileIcon(filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
@@ -50,6 +65,9 @@ export default function NoteEditorPage() {
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [noteColor, setNoteColor] = useState('')
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const colorPickerRef = useRef<HTMLDivElement>(null)
   const [showTaskLinker, setShowTaskLinker] = useState(false)
   const [taskSearch, setTaskSearch] = useState('')
   const [availableTasks, setAvailableTasks] = useState<LinkedTask[]>([])
@@ -65,6 +83,7 @@ export default function NoteEditorPage() {
       const note: Note = await res.json()
       setTitle(note.title)
       setContent(note.content)
+      setNoteColor(note.color || '')
       setTags(note.tags.map(t => t.name))
       setAttachments(note.attachments)
       setLinkedTasks(note.linked_tasks)
@@ -136,6 +155,28 @@ export default function NoteEditorPage() {
     t.name.toLowerCase().includes(tagInput.toLowerCase()) &&
     !tags.includes(t.name)
   ).slice(0, 8)
+
+  // Close color picker on outside click
+  useEffect(() => {
+    if (!showColorPicker) return
+    const handler = (e: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
+        setShowColorPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showColorPicker])
+
+  const handleSetColor = async (color: string) => {
+    setNoteColor(color)
+    setShowColorPicker(false)
+    await fetch(`/api/notes/${noteId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ color }),
+    })
+  }
 
   // File uploads
   const existingSize = attachments.reduce((sum, a) => sum + a.size, 0)
@@ -250,6 +291,42 @@ export default function NoteEditorPage() {
           {saving && <span className="text-xs text-surface-700">Saving...</span>}
           {!saving && hasUnsavedChanges && <span className="text-xs text-accent-amber">Unsaved</span>}
           {!saving && !hasUnsavedChanges && <span className="text-xs text-surface-700">Saved</span>}
+          <div className="relative" ref={colorPickerRef}>
+            <button
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              className={cn('p-2 rounded-xl hover:bg-surface-300/30 transition-colors', showColorPicker && 'bg-surface-300/30')}
+              title="Note color"
+            >
+              {noteColor ? (
+                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: noteColor }} />
+              ) : (
+                <Palette className="w-4 h-4 text-surface-700" />
+              )}
+            </button>
+            {showColorPicker && (
+              <div className="absolute right-0 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 p-2.5 min-w-[160px] animate-scale-in">
+                <p className="text-[10px] font-semibold text-surface-700 uppercase tracking-wider mb-2 px-0.5">Card Color</p>
+                <div className="grid grid-cols-6 gap-2">
+                  {NOTE_COLORS.map(c => (
+                    <button
+                      key={c.value || 'none'}
+                      type="button"
+                      onClick={() => handleSetColor(c.value)}
+                      className={cn(
+                        'w-6 h-6 rounded-full transition-all hover:scale-110 flex items-center justify-center',
+                        noteColor === c.value && 'ring-2 ring-offset-1 ring-brand-400 ring-offset-surface-100',
+                        !c.value && 'border border-surface-400/40',
+                      )}
+                      style={c.value ? { backgroundColor: c.value } : undefined}
+                      title={c.name}
+                    >
+                      {!c.value && <X className="w-3 h-3 text-surface-700" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           <button onClick={handleManualSave} className="btn-primary flex items-center gap-2 text-sm py-2">
             <Save className="w-3.5 h-3.5" /> Save
           </button>

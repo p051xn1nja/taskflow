@@ -207,6 +207,13 @@ function initializeSchema(db: Database.Database) {
     db.exec("ALTER TABLE tasks ADD COLUMN location TEXT NOT NULL DEFAULT ''")
   }
 
+  // Migration: add color to notes if missing
+  const noteColumns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
+  const noteColumnNames = noteColumns.map(c => c.name)
+  if (!noteColumnNames.includes('color')) {
+    db.exec("ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT ''")
+  }
+
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)
 

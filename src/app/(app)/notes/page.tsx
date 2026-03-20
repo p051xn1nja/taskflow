@@ -1,14 +1,29 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Filter, FileText, Hash, Calendar,
-  Pencil, Trash2, Loader2, Link2, Paperclip,
+  Pencil, Trash2, Loader2, Link2, Paperclip, Palette, X, ChevronDown,
 } from 'lucide-react'
 import { cn, formatDate, formatDateTime } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
 import type { Note, Tag } from '@/types'
+
+const NOTE_COLORS = [
+  { name: 'None', value: '' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Amber', value: '#f59e0b' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Lime', value: '#84cc16' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Cyan', value: '#06b6d4' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Pink', value: '#ec4899' },
+]
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '').replace(/&[^;]+;/g, ' ').trim()
@@ -25,6 +40,15 @@ export default function NotesPage() {
   const [search, setSearch] = useState('')
   const [filterTag, setFilterTag] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+
+  // Tag filter search
+  const [tagFilterSearch, setTagFilterSearch] = useState('')
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const tagDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Color picker state
+  const [colorPickerNoteId, setColorPickerNoteId] = useState<string | null>(null)
+  const colorPickerRef = useRef<HTMLDivElement>(null)
 
   const fetchNotes = useCallback(async (page = 1) => {
     setLoading(true)
@@ -53,6 +77,42 @@ export default function NotesPage() {
     return () => clearTimeout(timer)
   }, [fetchNotes])
 
+  // Close color picker on outside click
+  useEffect(() => {
+    if (!colorPickerNoteId) return
+    const handler = (e: MouseEvent) => {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(e.target as Node)) {
+        setColorPickerNoteId(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [colorPickerNoteId])
+
+  // Close tag dropdown on outside click
+  useEffect(() => {
+    if (!showTagDropdown) return
+    const handler = (e: MouseEvent) => {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setShowTagDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showTagDropdown])
+
+  // ESC to close popups
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (colorPickerNoteId) { setColorPickerNoteId(null); return }
+        if (showTagDropdown) { setShowTagDropdown(false); return }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [colorPickerNoteId, showTagDropdown])
+
   const handleCreateNote = async () => {
     const res = await fetch('/api/notes', {
       method: 'POST',
@@ -68,6 +128,22 @@ export default function NotesPage() {
     await fetch(`/api/notes/${id}`, { method: 'DELETE' })
     fetchNotes(pagination.page)
   }
+
+  const handleSetColor = async (noteId: string, color: string) => {
+    await fetch(`/api/notes/${noteId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ color }),
+    })
+    setNotes(prev => prev.map(n => n.id === noteId ? { ...n, color } : n))
+    setColorPickerNoteId(null)
+  }
+
+  const filteredDropdownTags = allTags.filter(t =>
+    t.name.toLowerCase().includes(tagFilterSearch.toLowerCase())
+  )
+
+  const selectedTagObj = allTags.find(t => t.name === filterTag)
 
   return (
     <div className="space-y-6">
@@ -107,16 +183,84 @@ export default function NotesPage() {
 
         {showFilters && (
           <div className="pt-2 border-t border-surface-300/20 animate-slide-down">
-            <select
-              className="input-base text-sm"
-              value={filterTag}
-              onChange={e => setFilterTag(e.target.value)}
-            >
-              <option value="">All Tags</option>
-              {allTags.map(t => (
-                <option key={t.id} value={t.name}>{t.name}</option>
-              ))}
-            </select>
+            <div className="relative" ref={tagDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowTagDropdown(!showTagDropdown)}
+                className="input-base text-sm w-full text-left flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2 truncate">
+                  {filterTag ? (
+                    <>
+                      {selectedTagObj && (
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: selectedTagObj.color }} />
+                      )}
+                      <span className="text-surface-900">{filterTag}</span>
+                    </>
+                  ) : (
+                    <span className="text-surface-700">All Tags</span>
+                  )}
+                </span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {filterTag && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setFilterTag(''); setTagFilterSearch('') }}
+                      className="p-0.5 rounded hover:bg-surface-300/40 text-surface-700 hover:text-surface-900"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  <ChevronDown className={cn('w-4 h-4 text-surface-700 transition-transform', showTagDropdown && 'rotate-180')} />
+                </div>
+              </button>
+              {showTagDropdown && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="p-2 border-b border-surface-300/20">
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-surface-700 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        className="input-base pl-8 text-sm py-1.5"
+                        placeholder="Search tags..."
+                        value={tagFilterSearch}
+                        onChange={e => setTagFilterSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto">
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-surface-300/30 transition-colors',
+                        !filterTag && 'bg-brand-600/10 text-brand-400',
+                      )}
+                      onClick={() => { setFilterTag(''); setTagFilterSearch(''); setShowTagDropdown(false) }}
+                    >
+                      <span className="text-surface-900">All Tags</span>
+                    </button>
+                    {filteredDropdownTags.map(tag => (
+                      <button
+                        key={tag.id}
+                        type="button"
+                        className={cn(
+                          'flex items-center gap-2 w-full px-3 py-2 text-sm text-left hover:bg-surface-300/30 transition-colors',
+                          filterTag === tag.name && 'bg-brand-600/10 text-brand-400',
+                        )}
+                        onClick={() => { setFilterTag(tag.name); setTagFilterSearch(''); setShowTagDropdown(false) }}
+                      >
+                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: tag.color }} />
+                        <span className="text-surface-900">{tag.name}</span>
+                      </button>
+                    ))}
+                    {filteredDropdownTags.length === 0 && (
+                      <p className="text-xs text-surface-700 text-center py-3">No tags found</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -138,17 +282,60 @@ export default function NotesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {notes.map(note => {
             const preview = stripHtml(note.content).slice(0, 150)
+            const noteColor = note.color || ''
             return (
               <div
                 key={note.id}
                 onClick={() => router.push(`/notes/${note.id}`)}
                 className="card p-4 group hover:border-surface-400/40 transition-all cursor-pointer"
+                style={noteColor ? {
+                  borderTopWidth: '3px',
+                  borderTopColor: noteColor,
+                  borderTopStyle: 'solid',
+                } : undefined}
               >
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="font-medium text-surface-950 truncate flex-1 pr-2">
                     {note.title}
                   </h3>
                   <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <div className="relative">
+                      <button
+                        onClick={e => { e.stopPropagation(); setColorPickerNoteId(colorPickerNoteId === note.id ? null : note.id) }}
+                        className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                        title="Note color"
+                      >
+                        <Palette className="w-3.5 h-3.5" />
+                      </button>
+                      {colorPickerNoteId === note.id && (
+                        <div
+                          ref={colorPickerRef}
+                          onClick={e => e.stopPropagation()}
+                          className="absolute right-0 top-full mt-1 bg-surface-100 border border-surface-300/40 rounded-xl shadow-xl z-50 p-2.5 min-w-[160px] animate-scale-in"
+                        >
+                          <p className="text-[10px] font-semibold text-surface-700 uppercase tracking-wider mb-2 px-0.5">Card Color</p>
+                          <div className="grid grid-cols-6 gap-2">
+                            {NOTE_COLORS.map(c => (
+                              <button
+                                key={c.value || 'none'}
+                                type="button"
+                                onClick={() => handleSetColor(note.id, c.value)}
+                                className={cn(
+                                  'w-6 h-6 rounded-full transition-all hover:scale-110 flex items-center justify-center',
+                                  noteColor === c.value && 'ring-2 ring-offset-1 ring-brand-400 ring-offset-surface-100',
+                                )}
+                                style={c.value ? { backgroundColor: c.value } : undefined}
+                                title={c.name}
+                              >
+                                {!c.value && (
+                                  <X className="w-3 h-3 text-surface-700" />
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <button
                       onClick={e => { e.stopPropagation(); router.push(`/notes/${note.id}`) }}
                       className="p-1.5 rounded-lg hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
