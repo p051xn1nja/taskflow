@@ -21,10 +21,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!fs.existsSync(filePath)) return NextResponse.json({ error: 'File missing' }, { status: 404 })
 
   const buffer = fs.readFileSync(filePath)
+  const url = new URL(_req.url)
+  const disposition = url.searchParams.has('inline') ? 'inline' : 'attachment'
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': attachment.mime_type,
-      'Content-Disposition': `attachment; filename="${encodeURIComponent(attachment.original_name)}"`,
+      'Content-Disposition': `${disposition}; filename="${encodeURIComponent(attachment.original_name)}"`,
     },
   })
 }

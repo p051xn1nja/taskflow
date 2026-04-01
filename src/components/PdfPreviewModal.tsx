@@ -50,7 +50,7 @@ export function PdfPreviewModal({ url, filename, onClose }: PdfPreviewModalProps
       {/* PDF iframe */}
       <div className="w-full max-w-4xl flex-1 min-h-0 rounded-xl overflow-hidden bg-white animate-scale-in">
         <iframe
-          src={url}
+          src={`${url}${url.includes('?') ? '&' : '?'}inline`}
           className="w-full h-full border-0"
           title={`Preview: ${filename}`}
         />
