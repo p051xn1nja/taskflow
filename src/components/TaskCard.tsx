@@ -3,9 +3,10 @@
 import { useState } from 'react'
 import {
   ChevronDown, ChevronRight, Pencil, Trash2, Check,
-  Paperclip, Calendar, Download, FileText, Hash, MapPin,
+  Paperclip, Calendar, Download, FileText, Hash, MapPin, Eye,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
+import { PdfPreviewModal, isPdf } from '@/components/PdfPreviewModal'
 import type { Task } from '@/types'
 
 interface TaskCardProps {
@@ -17,6 +18,7 @@ interface TaskCardProps {
 
 export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
 
   const isCompleted = task.task_status?.is_completed ?? task.status === 'completed'
 
@@ -200,6 +202,15 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
                       <FileText className="w-4 h-4 text-surface-700 flex-shrink-0" />
                       <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
                       <span className="text-xs text-surface-700">{formatFileSize(att.size)}</span>
+                      {isPdf(att.original_name) && (
+                        <button
+                          onClick={() => setPdfPreview({ url: `/api/uploads/${att.id}`, name: att.original_name })}
+                          className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                          title="Preview PDF"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <a
                         href={`/api/uploads/${att.id}`}
                         className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
@@ -215,6 +226,9 @@ export function TaskCard({ task, onUpdate, onDelete, onEdit }: TaskCardProps) {
           </div>
         )}
       </div>
+      {pdfPreview && (
+        <PdfPreviewModal url={pdfPreview.url} filename={pdfPreview.name} onClose={() => setPdfPreview(null)} />
+      )}
     </div>
   )
 }

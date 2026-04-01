@@ -6,11 +6,12 @@ import {
   ArrowLeft, Save, Trash2, Plus, X, Hash, Link2,
   Upload, FileText, Download, AlertCircle, Loader2,
   Image as ImageIcon, FileArchive, FileSpreadsheet,
-  CheckSquare, Search, Palette, Tag as TagIcon,
+  CheckSquare, Search, Palette, Tag as TagIcon, Eye,
 } from 'lucide-react'
 import { cn, formatFileSize, formatDate } from '@/lib/utils'
 import { RichEditor } from '@/components/RichEditor'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { PdfPreviewModal, isPdf } from '@/components/PdfPreviewModal'
 import type { Note, Tag, NoteAttachment, LinkedTask, Category } from '@/types'
 
 const ALLOWED_EXTENSIONS = new Set([
@@ -71,6 +72,7 @@ export default function NoteEditorPage() {
   const [linkedTasks, setLinkedTasks] = useState<LinkedTask[]>([])
   const [stagedFiles, setStagedFiles] = useState<File[]>([])
   const [fileError, setFileError] = useState<string | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const [noteColor, setNoteColor] = useState('')
   const [showColorPicker, setShowColorPicker] = useState(false)
@@ -549,6 +551,15 @@ export default function NoteEditorPage() {
                 {getFileIcon(att.original_name)}
                 <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
                 <span className="text-xs text-surface-700 tabular-nums">{formatFileSize(att.size)}</span>
+                {isPdf(att.original_name) && (
+                  <button
+                    onClick={() => setPdfPreview({ url: `/api/note-uploads/${att.id}`, name: att.original_name })}
+                    className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                    title="Preview PDF"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <a
                   href={`/api/note-uploads/${att.id}`}
                   className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
@@ -644,6 +655,9 @@ export default function NoteEditorPage() {
         onConfirm={executeDelete}
         onCancel={() => setShowConfirmDelete(false)}
       />
+      {pdfPreview && (
+        <PdfPreviewModal url={pdfPreview.url} filename={pdfPreview.name} onClose={() => setPdfPreview(null)} />
+      )}
     </div>
   )
 }

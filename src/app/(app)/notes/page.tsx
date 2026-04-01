@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation'
 import {
   Plus, Search, Filter, FileText, Hash, Calendar,
   Pencil, Trash2, Loader2, Link2, Paperclip, Palette, X, ChevronDown, ChevronRight,
-  Download, CheckSquare, BookOpen, Tag as TagIcon, Clock,
+  Download, CheckSquare, BookOpen, Tag as TagIcon, Clock, Eye,
 } from 'lucide-react'
 import { cn, formatDate, formatFileSize } from '@/lib/utils'
 import { Pagination } from '@/components/Pagination'
 import { ConfirmModal } from '@/components/ConfirmModal'
+import { PdfPreviewModal, isPdf } from '@/components/PdfPreviewModal'
 import type { Note, Tag, Category } from '@/types'
 
 const NOTE_COLORS = [
@@ -66,6 +67,7 @@ export default function NotesPage() {
   // Note detail modal
   const [noteDetail, setNoteDetail] = useState<Note | null>(null)
   const [noteDetailLoading, setNoteDetailLoading] = useState(false)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
   const noteDetailRef = useRef<HTMLDivElement>(null)
 
   // Collapsed groups (years, months, days)
@@ -829,6 +831,15 @@ export default function NotesPage() {
                         <FileText className="w-4 h-4 text-surface-700 flex-shrink-0" />
                         <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
                         <span className="text-xs text-surface-700">{formatFileSize(att.size)}</span>
+                        {isPdf(att.original_name) && (
+                          <button
+                            onClick={() => setPdfPreview({ url: `/api/note-uploads/${att.id}`, name: att.original_name })}
+                            className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                            title="Preview PDF"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         <a href={`/api/note-uploads/${att.id}`}
                           className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
                           title="Download">
@@ -858,6 +869,9 @@ export default function NotesPage() {
         onConfirm={executeDeleteNote}
         onCancel={() => setConfirmDelete(null)}
       />
+      {pdfPreview && (
+        <PdfPreviewModal url={pdfPreview.url} filename={pdfPreview.name} onClose={() => setPdfPreview(null)} />
+      )}
     </div>
   )
 }

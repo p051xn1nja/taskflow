@@ -3,9 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X, Plus, Upload, FileText, Download, Trash2, AlertCircle,
-  Image as ImageIcon, FileArchive, FileSpreadsheet, Hash, MapPin,
+  Image as ImageIcon, FileArchive, FileSpreadsheet, Hash, MapPin, Eye,
 } from 'lucide-react'
 import { cn, formatFileSize } from '@/lib/utils'
+import { PdfPreviewModal, isPdf } from '@/components/PdfPreviewModal'
 import type { Task, Category, Attachment, Tag } from '@/types'
 
 const ALLOWED_EXTENSIONS = new Set([
@@ -72,6 +73,7 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
   const [uploading, setUploading] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [fileError, setFileError] = useState<string | null>(null)
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; name: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const isEditing = !!task
@@ -462,6 +464,16 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
                     {getFileIcon(att.original_name)}
                     <span className="flex-1 truncate text-surface-800">{att.original_name}</span>
                     <span className="text-xs text-surface-700 tabular-nums">{formatFileSize(att.size)}</span>
+                    {isPdf(att.original_name) && (
+                      <button
+                        type="button"
+                        onClick={() => setPdfPreview({ url: `/api/uploads/${att.id}`, name: att.original_name })}
+                        className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
+                        title="Preview PDF"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <a
                       href={`/api/uploads/${att.id}`}
                       className="p-1 rounded hover:bg-surface-300/40 text-surface-700 hover:text-brand-400 transition-colors"
@@ -564,6 +576,9 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
           </div>
         </form>
       </div>
+      {pdfPreview && (
+        <PdfPreviewModal url={pdfPreview.url} filename={pdfPreview.name} onClose={() => setPdfPreview(null)} />
+      )}
     </div>
   )
 }
