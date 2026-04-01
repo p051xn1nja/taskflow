@@ -57,6 +57,7 @@ src/
 │   ├── TaskCard.tsx          # List view task card (read-only expanded view)
 │   ├── TaskForm.tsx          # Edit/create modal (progress, files, tags with autocomplete)
 │   ├── RichEditor.tsx        # TipTap rich HTML editor (tables, images, colors, alignment); no overflow-hidden on root (toolbar dropdowns must not clip)
+│   ├── PdfPreviewModal.tsx    # Reusable PDF preview modal (iframe-based, Eye icon trigger)
 │   ├── ConfirmModal.tsx      # Reusable delete confirmation modal (replaces browser confirm())
 │   ├── Pagination.tsx        # Reusable pagination with page numbers, first/last/prev/next
 │   ├── FileUpload.tsx        # Legacy upload component (unused, superseded by TaskForm)
@@ -153,7 +154,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Search & Filters card uses `relative z-10` to ensure dropdowns render above the collapsible accordion sections below
   - Tag filter is a searchable dropdown/combobox (fetched from `/api/tags`) — type to filter, click to select, clear button to reset
   - Stats cards are dynamic — one card per user-defined status (colored by status), plus Total and Avg Progress; scrollable if many statuses
-  - Expanded card view is read-only (description, location, tags with colors, attachments with download); expanded content has no left margin on mobile (`ml-0 sm:ml-14`)
+  - Expanded card view is read-only (description, location, tags with colors, attachments with download/PDF preview); expanded content has no left margin on mobile (`ml-0 sm:ml-14`)
   - Tag names displayed as colored badges on each task card
   - Progress bar displayed on each card; editing progress is done via the edit modal
   - Checkbox toggles completion: sets status to completed (with `status_id` auto-resolved), progress=100, title struck through
@@ -225,7 +226,7 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
   - Tags are shared across tasks and notes
 - **Edit Modal** (`TaskForm`): Unified edit experience for both list and board views
   - Progress slider (edit mode only) — updates task progress directly
-  - File attachments: upload (drag-and-drop or browse), download, and delete
+  - File attachments: upload (drag-and-drop or browse), download, PDF preview (Eye icon), and delete
   - Tags with autocomplete dropdown from master tags, colored badges
   - Category, location, start date, due date, title, description editing
   - New files are staged and uploaded on save; attachment deletes are immediate
@@ -253,8 +254,8 @@ Users can upload a profile photo displayed in the sidebar avatar and admin user 
 - **Management**: Download and delete individual attachments in edit mode
 - **Task Detail API**: `GET /api/tasks/:id` (single task with enriched tags, attachments, category, status)
 - **Task Reorder API**: `POST /api/tasks/reorder` — batch update `board_position` for kanban card ordering; body: `{ items: [{ id, board_position }] }`
-- **Task API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download), `DELETE /api/uploads/:id` (delete)
-- **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download), `DELETE /api/note-uploads/:id` (delete)
+- **Task API**: `POST /api/uploads` (upload), `GET /api/uploads/:id` (download; append `?inline` for inline Content-Disposition), `DELETE /api/uploads/:id` (delete)
+- **Note API**: `POST /api/note-uploads` (upload), `GET /api/note-uploads/:id` (download; append `?inline` for inline Content-Disposition), `DELETE /api/note-uploads/:id` (delete)
 - **Editor Images**: `POST /api/editor-upload` (upload image, returns URL), `GET /api/editor-upload/:id` (serve image)
 - **Profile Photo**: `POST /api/profile-photo` (upload), `GET /api/profile-photo/:filename` (serve), `DELETE /api/profile-photo` (remove)
 - **Profile API**: `GET /api/profile` (current user data), `PATCH /api/profile` (update display_name, email, password with current_password verification)
@@ -313,5 +314,6 @@ Managed via Admin → Settings (`platform_settings` table):
 - All delete confirmations use the `ConfirmModal` component (`src/components/ConfirmModal.tsx`) — no vanilla `confirm()` dialogs; modal shows warning icon, title, message, Cancel/Delete buttons with backdrop blur
 - Date formatting uses European format (`en-GB` locale): "20 Mar 2026" (day month year); `formatDate()` and `formatDateTime()` in `src/lib/utils.ts`; date grouping keys in tasks/notes pages also use `en-GB`
 - Date input calendar picker icons are white (CSS `filter: invert(1)` on `::-webkit-calendar-picker-indicator`)
+- PDF attachments have an inline preview via `PdfPreviewModal` (Eye icon button next to Download); rendered in an iframe using the `?inline` query param on the upload API to set `Content-Disposition: inline`; available in all 6 attachment locations: TaskCard expanded view, TaskForm edit modal, Calendar task detail modal, Calendar note detail modal, Notes page detail modal, Note editor attachments; modal uses z-[60] to layer above other modals (z-50); `isPdf()` helper checks file extension to conditionally show the Eye button
 - Deleting a task or note also deletes all associated attachment files from disk (not just DB cascade)
 - Footer with build info (dynamic app name + "build 20260320-21-stable by p051xn1nja") shown on all pages via `Footer` component (app layout) and login page; app name sourced from `AppSettingsProvider`
