@@ -116,5 +116,11 @@ export const authOptions: NextAuthOptions = {
     strategy: 'jwt',
     maxAge: 24 * 60 * 60,
   },
-  secret: process.env.NEXTAUTH_SECRET || 'dev-only-secret-not-for-production',
+  secret: (() => {
+    const secret = process.env.NEXTAUTH_SECRET
+    if (!secret && process.env.NODE_ENV === 'production') {
+      console.error('NEXTAUTH_SECRET is not set in production; falling back to insecure development secret')
+    }
+    return secret || 'dev-only-secret-not-for-production'
+  })(),
 }

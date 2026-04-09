@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
+import { getPlatformSettings } from '@/lib/platform-settings'
 
 export async function GET() {
   const { error, session } = await requireAuth()
@@ -38,6 +39,12 @@ export async function POST(req: Request) {
   }
 
   const db = getDb()
+  const settings = getPlatformSettings(db)
+  const categoryCount = db.prepare('SELECT COUNT(*) as count FROM categories WHERE user_id = ?').get(session!.user.id) as { count: number }
+  if (categoryCount.count >= settings.maxCategoriesPerUser) {
+    return NextResponse.json({ error: `Category limit reached (${settings.maxCategoriesPerUser})` }, { status: 400 })
+  }
+
   const id = generateId()
   db.prepare('INSERT INTO categories (id, user_id, name, color) VALUES (?, ?, ?, ?)').run(
     id, session!.user.id, name.trim(), color || '#64748b'

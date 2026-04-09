@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getDb, ensureDefaultStatuses } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
+import { getPlatformSettings } from '@/lib/platform-settings'
 import type { Task } from '@/types'
 
 export async function GET(req: Request) {
@@ -80,18 +81,41 @@ export async function GET(req: Request) {
     status_name: string | null; status_color: string | null; status_is_completed: number | null; status_is_default: number | null; status_position: number | null
   })[]
 
-  const getTagsStmt = db.prepare(`
-    SELECT tg.id, tg.name, tg.color
-    FROM task_tags tt
-    JOIN tags tg ON tt.tag_id = tg.id
-    WHERE tt.task_id = ?
-  `)
-  const getAttachmentsStmt = db.prepare('SELECT * FROM attachments WHERE task_id = ?')
+  const taskIds = tasks.map(t => t.id)
+  const tagsByTask = new Map<string, { id: string; name: string; color: string }[]>()
+  const attachmentsByTask = new Map<string, Record<string, unknown>[]>()
+
+  if (taskIds.length > 0) {
+    const placeholders = taskIds.map(() => '?').join(', ')
+    const tags = db.prepare(`
+      SELECT tt.task_id, tg.id, tg.name, tg.color
+      FROM task_tags tt
+      JOIN tags tg ON tt.tag_id = tg.id
+      WHERE tt.task_id IN (${placeholders})
+    `).all(...taskIds) as { task_id: string; id: string; name: string; color: string }[]
+
+    const attachments = db.prepare(`
+      SELECT * FROM attachments
+      WHERE task_id IN (${placeholders})
+    `).all(...taskIds) as (Record<string, unknown> & { task_id: string })[]
+
+    for (const tagRow of tags) {
+      const current = tagsByTask.get(tagRow.task_id) || []
+      current.push({ id: tagRow.id, name: tagRow.name, color: tagRow.color })
+      tagsByTask.set(tagRow.task_id, current)
+    }
+
+    for (const attachmentRow of attachments) {
+      const current = attachmentsByTask.get(attachmentRow.task_id) || []
+      current.push(attachmentRow)
+      attachmentsByTask.set(attachmentRow.task_id, current)
+    }
+  }
 
   const enrichedTasks = tasks.map(task => ({
     ...task,
-    tags: getTagsStmt.all(task.id) as { id: string; name: string; color: string }[],
-    attachments: getAttachmentsStmt.all(task.id),
+    tags: tagsByTask.get(task.id) || [],
+    attachments: attachmentsByTask.get(task.id) || [],
     category: task.category_id ? { id: task.category_id, name: task.category_name!, color: task.category_color! } : null,
     task_status: task.status_id ? {
       id: task.status_id,
@@ -127,6 +151,12 @@ export async function POST(req: Request) {
   const db = getDb()
   const id = generateId()
   const userId = session!.user.id
+  const settings = getPlatformSettings(db)
+
+  const taskCount = db.prepare('SELECT COUNT(*) as count FROM tasks WHERE user_id = ?').get(userId) as { count: number }
+  if (taskCount.count >= settings.maxTasksPerUser) {
+    return NextResponse.json({ error: `Task limit reached (${settings.maxTasksPerUser})` }, { status: 400 })
+  }
 
   ensureDefaultStatuses(db, userId)
 
@@ -139,31 +169,34 @@ export async function POST(req: Request) {
     resolvedStatusId = defaultStatus?.id || null
   }
 
-  db.prepare(`
-    INSERT INTO tasks (id, user_id, title, description, category_id, start_date, due_date, status_id, location)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, start_date || null, due_date || null, resolvedStatusId, (location || '').trim())
+  const createTaskTx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO tasks (id, user_id, title, description, category_id, start_date, due_date, status_id, location)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, start_date || null, due_date || null, resolvedStatusId, (location || '').trim())
 
-  // Insert tags
-  if (tags && Array.isArray(tags)) {
-    const findTag = db.prepare('SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE')
-    const insertTag = db.prepare('INSERT INTO tags (id, user_id, name, color) VALUES (?, ?, ?, ?)')
-    const insertTaskTag = db.prepare('INSERT INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)')
+    if (tags && Array.isArray(tags)) {
+      const findTag = db.prepare('SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE')
+      const insertTag = db.prepare('INSERT INTO tags (id, user_id, name, color) VALUES (?, ?, ?, ?)')
+      const insertTaskTag = db.prepare('INSERT INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)')
 
-    for (const tagName of tags.slice(0, 10)) {
-      const trimmed = typeof tagName === 'string' ? tagName.trim().slice(0, 30) : ''
-      if (!trimmed) continue
+      for (const tagName of tags.slice(0, 10)) {
+        const trimmed = typeof tagName === 'string' ? tagName.trim().slice(0, 30) : ''
+        if (!trimmed) continue
 
-      let tagRow = findTag.get(userId, trimmed) as { id: string } | undefined
-      if (!tagRow) {
-        const newTagId = generateId()
-        insertTag.run(newTagId, userId, trimmed, '#3b82f6')
-        tagRow = { id: newTagId }
+        let tagRow = findTag.get(userId, trimmed) as { id: string } | undefined
+        if (!tagRow) {
+          const newTagId = generateId()
+          insertTag.run(newTagId, userId, trimmed, '#3b82f6')
+          tagRow = { id: newTagId }
+        }
+
+        insertTaskTag.run(generateId(), id, tagRow.id)
       }
-
-      insertTaskTag.run(generateId(), id, tagRow.id)
     }
-  }
+  })
+
+  createTaskTx()
 
   return NextResponse.json({ id }, { status: 201 })
 }

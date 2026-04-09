@@ -2,18 +2,44 @@ import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
+import { getPlatformSettings } from '@/lib/platform-settings'
 
 const ALLOWED_EXTENSIONS = new Set([
   'pdf', 'txt', 'md', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
   'csv', 'json', 'rtf', 'odt',
   'zip', 'rar', '7z', 'tar', 'gz',
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
 ])
 
 const MAX_FILES_PER_TASK = 10
-const MAX_TOTAL_SIZE = 50 * 1024 * 1024 // 50MB total per task
+const MIME_BY_EXTENSION: Record<string, string[]> = {
+  pdf: ['application/pdf'],
+  txt: ['text/plain'],
+  md: ['text/markdown', 'text/plain'],
+  docx: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+  doc: ['application/msword'],
+  xlsx: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+  xls: ['application/vnd.ms-excel'],
+  pptx: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'],
+  ppt: ['application/vnd.ms-powerpoint'],
+  csv: ['text/csv', 'application/vnd.ms-excel', 'text/plain'],
+  json: ['application/json', 'text/json', 'text/plain'],
+  rtf: ['application/rtf', 'text/rtf'],
+  odt: ['application/vnd.oasis.opendocument.text'],
+  zip: ['application/zip', 'application/x-zip-compressed'],
+  rar: ['application/vnd.rar', 'application/x-rar-compressed'],
+  '7z': ['application/x-7z-compressed'],
+  tar: ['application/x-tar'],
+  gz: ['application/gzip', 'application/x-gzip'],
+  png: ['image/png'],
+  jpg: ['image/jpeg'],
+  jpeg: ['image/jpeg'],
+  gif: ['image/gif'],
+  webp: ['image/webp'],
+  bmp: ['image/bmp'],
+}
 
 export async function POST(req: Request) {
   const { error, session } = await requireAuth()
@@ -26,6 +52,9 @@ export async function POST(req: Request) {
   if (!taskId) return NextResponse.json({ error: 'task_id required' }, { status: 400 })
 
   const db = getDb()
+  const settings = getPlatformSettings(db)
+  const maxTotalSize = settings.maxFileSizeMb * 1024 * 1024
+
   const task = db.prepare('SELECT id FROM tasks WHERE id = ? AND user_id = ?').get(taskId, session!.user.id)
   if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
@@ -38,20 +67,22 @@ export async function POST(req: Request) {
   }
 
   const newTotalSize = files.reduce((sum, f) => sum + f.size, 0)
-  if (existing.total_size + newTotalSize > MAX_TOTAL_SIZE) {
-    return NextResponse.json({ error: 'Total file size would exceed 50 MB limit' }, { status: 400 })
+  if (existing.total_size + newTotalSize > maxTotalSize) {
+    return NextResponse.json({ error: `Total file size would exceed ${settings.maxFileSizeMb} MB limit` }, { status: 400 })
   }
 
   const uploaded = []
   for (const file of files) {
     const ext = file.name.split('.').pop()?.toLowerCase() || ''
     if (!ALLOWED_EXTENSIONS.has(ext)) continue
+    const allowedMimes = MIME_BY_EXTENSION[ext]
+    if (allowedMimes && file.type && !allowedMimes.includes(file.type)) continue
 
     const id = generateId()
     const filename = `${id}.${ext}`
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    fs.writeFileSync(path.join(UPLOADS_PATH, filename), buffer)
+    await fs.writeFile(path.join(UPLOADS_PATH, filename), buffer)
 
     db.prepare(
       'INSERT INTO attachments (id, task_id, filename, original_name, mime_type, size) VALUES (?, ?, ?, ?, ?, ?)'

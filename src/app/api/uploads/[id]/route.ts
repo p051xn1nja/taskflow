@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
@@ -18,15 +18,20 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   if (!attachment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const filePath = path.join(UPLOADS_PATH, attachment.filename)
-  if (!fs.existsSync(filePath)) return NextResponse.json({ error: 'File missing' }, { status: 404 })
+  try {
+    await fs.access(filePath)
+  } catch {
+    return NextResponse.json({ error: 'File missing' }, { status: 404 })
+  }
 
-  const buffer = fs.readFileSync(filePath)
+  const buffer = await fs.readFile(filePath)
   const url = new URL(_req.url)
   const disposition = url.searchParams.has('inline') ? 'inline' : 'attachment'
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': attachment.mime_type,
       'Content-Disposition': `${disposition}; filename="${encodeURIComponent(attachment.original_name)}"`,
+      'X-Content-Type-Options': 'nosniff',
     },
   })
 }
@@ -45,7 +50,11 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   if (!attachment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const filePath = path.join(UPLOADS_PATH, attachment.filename)
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  try {
+    await fs.unlink(filePath)
+  } catch {
+    // Ignore file delete errors and still clean DB record
+  }
 
   db.prepare('DELETE FROM attachments WHERE id = ?').run(params.id)
   return NextResponse.json({ success: true })
