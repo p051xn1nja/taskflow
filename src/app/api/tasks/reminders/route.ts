@@ -80,7 +80,8 @@ export async function GET(req: Request) {
   ).all(userId, userId, limit) : []
 
   let notificationDispatched = false
-  if (shouldNotify && process.env.REMINDER_WEBHOOK_URL) {
+  const hasAnyReminders = overdueCountRow.total > 0 || dueTodayCountRow.total > 0 || upcomingCountRow.total > 0
+  if (shouldNotify && hasAnyReminders && process.env.REMINDER_WEBHOOK_URL) {
     try {
       const res = await fetch(process.env.REMINDER_WEBHOOK_URL, {
         method: 'POST',
