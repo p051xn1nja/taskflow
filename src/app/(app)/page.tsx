@@ -5,13 +5,13 @@ import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import {
   Plus, Search, Filter, ChevronDown, ChevronRight, X,
-  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot,
+  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot, Bookmark, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
 import { Pagination } from '@/components/Pagination'
 import { ConfirmModal } from '@/components/ConfirmModal'
-import { cn, groupBy } from '@/lib/utils'
+import { cn, groupBy, parseQuickTaskInput } from '@/lib/utils'
 import type { Task, Category, Status, Tag as TagType } from '@/types'
 
 export default function TasksPage() {
@@ -23,6 +23,8 @@ export default function TasksPage() {
 }
 
 function TasksPageInner() {
+  type FocusView = 'all' | 'inbox' | 'today' | 'upcoming' | 'overdue' | 'no_status'
+
   const { data: session } = useSession()
   const searchParams = useSearchParams()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -40,6 +42,15 @@ function TasksPageInner() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [focusView, setFocusView] = useState<FocusView>('all')
+  const [savedViews, setSavedViews] = useState<{ id: string; name: string; filters_json: string }[]>([])
+  const [reminders, setReminders] = useState<{ overdue: number; due_today: number; next_7_days: number }>({ overdue: 0, due_today: 0, next_7_days: 0 })
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; title: string; description: string; category_id: string | null; tags: string[]; recurrence: 'none' | 'daily' | 'weekly' | 'monthly' }>>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateTitle, setTemplateTitle] = useState('')
+  const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -51,6 +62,9 @@ function TasksPageInner() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [defaultStartDate, setDefaultStartDate] = useState('')
   const [defaultDueDate, setDefaultDueDate] = useState('')
+  const [showQuickAdd, setShowQuickAdd] = useState(false)
+  const [quickTitle, setQuickTitle] = useState('')
+  const [quickDueDate, setQuickDueDate] = useState('')
 
   // Auto-open task form from calendar
   useEffect(() => {
@@ -62,6 +76,17 @@ function TasksPageInner() {
       window.history.replaceState({}, '', '/')
     }
   }, [searchParams])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowQuickAdd(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // Collapsed groups (years, months, days)
   const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set())
@@ -78,6 +103,7 @@ function TasksPageInner() {
     if (filterCategory) params.set('category_id', filterCategory)
     if (filterStatus) params.set('status_id', filterStatus)
     if (filterTag) params.set('tag', filterTag)
+    if (focusView !== 'all') params.set('view', focusView)
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
     params.set('page', String(page))
@@ -87,8 +113,9 @@ function TasksPageInner() {
     const data = await res.json()
     setTasks(data.tasks)
     setPagination(data.pagination)
+    fetchReminders()
     setLoading(false)
-  }, [search, filterCategory, filterStatus, filterTag, dateFrom, dateTo, pagination.per_page])
+  }, [search, filterCategory, filterStatus, filterTag, dateFrom, dateTo, focusView, pagination.per_page])
 
   const fetchCategories = async () => {
     const res = await fetch('/api/categories')
@@ -104,11 +131,29 @@ function TasksPageInner() {
     const res = await fetch('/api/tags')
     setAllTags(await res.json())
   }
+  const fetchSavedViews = async () => {
+    const res = await fetch('/api/task-views')
+    setSavedViews(await res.json())
+  }
+  const fetchReminders = async () => {
+    const res = await fetch('/api/tasks/reminders')
+    if (!res.ok) return
+    const data = await res.json()
+    setReminders(data.counts)
+  }
+  const fetchTemplates = async () => {
+    const res = await fetch('/api/task-templates')
+    if (!res.ok) return
+    setTemplates(await res.json())
+  }
 
   useEffect(() => {
     fetchCategories()
     fetchStatuses()
     fetchTags()
+    fetchSavedViews()
+    fetchReminders()
+    fetchTemplates()
   }, [])
 
   useEffect(() => {
@@ -138,7 +183,7 @@ function TasksPageInner() {
     return () => window.removeEventListener('keydown', handler)
   }, [showTagDropdown])
 
-  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string }) => {
+  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; recurrence?: 'none' | 'daily' | 'weekly' | 'monthly' }) => {
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +204,7 @@ function TasksPageInner() {
     fetchTasks(pagination.page)
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; progress?: number }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; recurrence?: 'none' | 'daily' | 'weekly' | 'monthly'; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -183,6 +228,143 @@ function TasksPageInner() {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
+  }
+
+  const handleQuickAdd = async () => {
+    const parsed = parseQuickTaskInput(quickTitle, quickDueDate)
+    const title = parsed.title
+    if (!title) return
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        due_date: parsed.due_date,
+      }),
+    })
+    setShowQuickAdd(false)
+    setQuickTitle('')
+    setQuickDueDate('')
+    fetchTasks(1)
+  }
+
+  const handleSaveCurrentView = async () => {
+    const name = window.prompt('Save current view as:')
+    if (!name?.trim()) return
+    await fetch('/api/task-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name.trim(),
+        filters: {
+          search,
+          category_id: filterCategory,
+          status_id: filterStatus,
+          tag: filterTag,
+          date_from: dateFrom,
+          date_to: dateTo,
+          view: focusView,
+        },
+      }),
+    })
+    fetchSavedViews()
+  }
+
+  const applySavedView = (filtersJson: string) => {
+    const f = JSON.parse(filtersJson) as {
+      search?: string
+      category_id?: string
+      status_id?: string
+      tag?: string
+      date_from?: string
+      date_to?: string
+      view?: FocusView
+    }
+    setSearch(f.search || '')
+    setFilterCategory(f.category_id || '')
+    setFilterStatus(f.status_id || '')
+    setFilterTag(f.tag || '')
+    setDateFrom(f.date_from || '')
+    setDateTo(f.date_to || '')
+    setFocusView(f.view || 'all')
+  }
+
+  const deleteSavedView = async (id: string) => {
+    await fetch(`/api/task-views/${id}`, { method: 'DELETE' })
+    fetchSavedViews()
+  }
+
+  const handleBulkCompleteVisible = async () => {
+    if (tasks.length === 0) return
+    await fetch('/api/tasks/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_ids: tasks.map(t => t.id), action: 'complete' }),
+    })
+    fetchTasks(pagination.page)
+  }
+
+  const handleBulkDeleteCompletedVisible = async () => {
+    const completedIds = tasks.filter(t => t.status === 'completed').map(t => t.id)
+    if (completedIds.length === 0) return
+    if (!window.confirm(`Delete ${completedIds.length} completed visible task(s)?`)) return
+    await fetch('/api/tasks/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ task_ids: completedIds, action: 'delete' }),
+    })
+    fetchTasks(pagination.page)
+  }
+
+  const applyTemplate = async () => {
+    const tpl = templates.find(t => t.id === selectedTemplateId)
+    if (!tpl) return
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: tpl.title,
+        description: tpl.description,
+        category_id: tpl.category_id,
+        tags: tpl.tags,
+        recurrence: tpl.recurrence,
+      }),
+    })
+    fetchTasks(1)
+  }
+
+  const createStarterSetup = async () => {
+    const res = await fetch('/api/tasks/bootstrap', { method: 'POST' })
+    if (!res.ok) return
+    fetchTasks(1)
+  }
+
+  const createTemplate = async () => {
+    const name = templateName.trim()
+    const title = templateTitle.trim()
+    if (!name || !title) return
+    await fetch('/api/task-templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        title,
+        recurrence: templateRecurrence,
+      }),
+    })
+    setShowTemplateModal(false)
+    setTemplateName('')
+    setTemplateTitle('')
+    setTemplateRecurrence('none')
+    fetchTemplates()
+  }
+
+  const deleteSelectedTemplate = async () => {
+    if (!selectedTemplateId) return
+    if (!window.confirm('Delete selected template?')) return
+    await fetch(`/api/task-templates/${selectedTemplateId}`, { method: 'DELETE' })
+    setSelectedTemplateId('')
+    fetchTemplates()
   }
 
   const toggleYear = (key: string) => {
@@ -268,6 +450,56 @@ function TasksPageInner() {
           <Plus className="w-4 h-4" /> <span className="hidden sm:inline">New Task</span><span className="sm:hidden">New</span>
         </button>
       </div>
+      <div className="card p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-surface-700">Template:</span>
+        <select
+          className="input-base text-sm max-w-[240px]"
+          value={selectedTemplateId}
+          onChange={e => setSelectedTemplateId(e.target.value)}
+        >
+          <option value="">Select template</option>
+          {templates.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={applyTemplate}
+          disabled={!selectedTemplateId}
+          className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-50"
+        >
+          Use template
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowTemplateModal(true)}
+          className="btn-secondary text-xs px-3 py-1.5"
+        >
+          New template
+        </button>
+        <button
+          type="button"
+          onClick={deleteSelectedTemplate}
+          disabled={!selectedTemplateId}
+          className="btn-secondary text-xs px-3 py-1.5 text-accent-red border-accent-red/40 disabled:opacity-50"
+        >
+          Delete template
+        </button>
+      </div>
+
+      {/* Reminder summary */}
+      {(reminders.overdue > 0 || reminders.due_today > 0 || reminders.next_7_days > 0) && (
+        <div className="card p-3 border border-accent-amber/25 bg-accent-amber/10 flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-accent-amber" />
+          <p className="text-sm text-surface-900">
+            {reminders.overdue > 0 && <span className="font-semibold">{reminders.overdue} overdue</span>}
+            {reminders.overdue > 0 && reminders.due_today > 0 && <span> · </span>}
+            {reminders.due_today > 0 && <span className="font-semibold">{reminders.due_today} due today</span>}
+            {(reminders.overdue > 0 || reminders.due_today > 0) && reminders.next_7_days > 0 && <span> · </span>}
+            {reminders.next_7_days > 0 && <span>{reminders.next_7_days} due in next 7 days</span>}
+          </p>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="flex gap-3 overflow-x-auto pb-1">
@@ -318,6 +550,78 @@ function TasksPageInner() {
 
       {/* Search & Filters */}
       <div className="card p-4 space-y-3 relative z-10">
+        <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'inbox', label: 'Inbox' },
+              { id: 'today', label: 'Today' },
+              { id: 'upcoming', label: 'Upcoming' },
+              { id: 'overdue', label: 'Overdue' },
+              { id: 'no_status', label: 'No Status' },
+            ].map(view => (
+            <button
+              key={view.id}
+              type="button"
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs border transition-colors',
+                focusView === view.id
+                  ? 'bg-brand-600/15 text-brand-300 border-brand-500/40'
+                  : 'bg-surface-200/20 text-surface-700 border-surface-300/30 hover:bg-surface-200/35',
+              )}
+              onClick={() => setFocusView(view.id as FocusView)}
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSaveCurrentView}
+            className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            Save view
+          </button>
+          {savedViews.map(v => (
+            <div key={v.id} className="inline-flex items-center rounded-lg border border-surface-300/30 bg-surface-200/20">
+              <button
+                type="button"
+                onClick={() => applySavedView(v.filters_json)}
+                className="px-2.5 py-1.5 text-xs text-surface-800 hover:text-white"
+                title="Apply saved view"
+              >
+                {v.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteSavedView(v.id)}
+                className="px-2 py-1.5 text-surface-700 hover:text-accent-red"
+                title="Delete saved view"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          {tasks.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={handleBulkCompleteVisible}
+                className="btn-secondary text-xs px-3 py-1.5"
+              >
+                Complete visible
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkDeleteCompletedVisible}
+                className="btn-secondary text-xs px-3 py-1.5 text-accent-red border-accent-red/40"
+              >
+                Delete completed
+              </button>
+            </>
+          )}
+        </div>
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-surface-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -467,6 +771,10 @@ function TasksPageInner() {
           </div>
           <h3 className="text-lg font-medium text-surface-800">No tasks found</h3>
           <p className="text-surface-700 text-sm mt-1">Create your first task to get started</p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <button onClick={() => setShowForm(true)} className="btn-primary text-sm px-4 py-2">New Task</button>
+            <button onClick={createStarterSetup} className="btn-secondary text-sm px-4 py-2">Starter Setup</button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -618,6 +926,78 @@ function TasksPageInner() {
         onConfirm={executeDeleteTask}
         onCancel={() => setConfirmDelete(null)}
       />
+
+      {showQuickAdd && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card w-full max-w-md p-5 space-y-3 animate-scale-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold">Quick Add Task</h3>
+              <button onClick={() => setShowQuickAdd(false)} className="p-1 rounded hover:bg-surface-300/30 text-surface-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <input
+              type="text"
+              className="input-base"
+              placeholder="Task title... (supports: today, tomorrow, next week, next monday)"
+              value={quickTitle}
+              onChange={e => setQuickTitle(e.target.value)}
+              autoFocus
+            />
+            <input
+              type="date"
+              className="input-base"
+              value={quickDueDate}
+              onChange={e => setQuickDueDate(e.target.value)}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowQuickAdd(false)} className="btn-secondary">Cancel</button>
+              <button onClick={handleQuickAdd} className="btn-primary">Create</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card w-full max-w-md p-5 space-y-3 animate-scale-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold">New Template</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="p-1 rounded hover:bg-surface-300/30 text-surface-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <input
+              type="text"
+              className="input-base"
+              placeholder="Template name..."
+              value={templateName}
+              onChange={e => setTemplateName(e.target.value)}
+            />
+            <input
+              type="text"
+              className="input-base"
+              placeholder="Default task title..."
+              value={templateTitle}
+              onChange={e => setTemplateTitle(e.target.value)}
+            />
+            <select
+              className="input-base"
+              value={templateRecurrence}
+              onChange={e => setTemplateRecurrence(e.target.value as 'none' | 'daily' | 'weekly' | 'monthly')}
+            >
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowTemplateModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={createTemplate} className="btn-primary">Save template</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
