@@ -569,10 +569,14 @@ function TasksPageInner() {
             {sendingReminderNotification ? 'Sending…' : 'Notify now'}
           </button>
           {reminderNotificationStatus === 'sent' && (
-            <span className="text-xs text-emerald-300">Reminder notifications sent</span>
+            <span className="text-xs text-emerald-300" role="status" aria-live="polite">
+              Reminder notifications sent
+            </span>
           )}
           {reminderNotificationStatus === 'failed' && (
-            <span className="text-xs text-rose-300">Failed to send reminder notifications</span>
+            <span className="text-xs text-rose-300" role="alert" aria-live="assertive">
+              Failed to send reminder notifications
+            </span>
           )}
         </div>
       )}
