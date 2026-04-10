@@ -70,6 +70,11 @@ export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new
     d.setDate(d.getDate() + 7)
     due = toYmd(d)
     title = title.replace(/\bnext week\b/ig, '').trim()
+  } else if (/\bnext month\b/i.test(title)) {
+    const d = new Date(now)
+    d.setMonth(d.getMonth() + 1)
+    due = toYmd(d)
+    title = title.replace(/\bnext month\b/ig, '').trim()
   } else {
     const weekdayPattern = /\bnext (sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i
     const match = title.match(weekdayPattern)

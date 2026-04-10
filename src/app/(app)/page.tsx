@@ -963,7 +963,7 @@ function TasksPageInner() {
             <input
               type="text"
               className="input-base"
-              placeholder="Task title... (supports: today, tomorrow, next week, next monday)"
+              placeholder="Task title... (supports: today, tomorrow, next week, next month, next monday)"
               value={quickTitle}
               onChange={e => setQuickTitle(e.target.value)}
               autoFocus

@@ -129,6 +129,13 @@ describe('parseQuickTaskInput', () => {
     })
   })
 
+  it('parses "next month" keyword', () => {
+    expect(parseQuickTaskInput('Plan roadmap next month', '', now)).toEqual({
+      title: 'Plan roadmap',
+      due_date: '2026-05-10',
+    })
+  })
+
   it('falls back to selected due date when no keyword exists', () => {
     expect(parseQuickTaskInput('Read docs', '2026-05-01', now)).toEqual({
       title: 'Read docs',
