@@ -26,9 +26,23 @@ export function checkRateLimit(key: string, options?: { limit?: number; windowMs
   return { allowed: true, remaining: limit - bucket.count, resetAt: bucket.resetAt }
 }
 
-export function getClientIdentifier(req: Request) {
-  const forwarded = req.headers.get('x-forwarded-for') || ''
-  const ip = forwarded.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
+function readHeader(req: { headers?: Headers | Record<string, string | string[] | undefined> }, name: string) {
+  const headers = req.headers
+  if (!headers) return ''
+
+  if (typeof (headers as Headers).get === 'function') {
+    return (headers as Headers).get(name) || ''
+  }
+
+  const value = (headers as Record<string, string | string[] | undefined>)[name]
+    ?? (headers as Record<string, string | string[] | undefined>)[name.toLowerCase()]
+  if (Array.isArray(value)) return value[0] || ''
+  return value || ''
+}
+
+export function getClientIdentifier(req: { headers?: Headers | Record<string, string | string[] | undefined> }) {
+  const forwarded = readHeader(req, 'x-forwarded-for')
+  const ip = forwarded.split(',')[0]?.trim() || readHeader(req, 'x-real-ip') || 'unknown'
   return createHash('sha256').update(ip).digest('hex').slice(0, 16)
 }
 
