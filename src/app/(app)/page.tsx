@@ -23,7 +23,7 @@ export default function TasksPage() {
 }
 
 function TasksPageInner() {
-  type FocusView = 'all' | 'inbox' | 'today' | 'upcoming' | 'overdue'
+  type FocusView = 'all' | 'inbox' | 'today' | 'upcoming' | 'overdue' | 'no_status'
 
   const { data: session } = useSession()
   const searchParams = useSearchParams()
@@ -557,6 +557,7 @@ function TasksPageInner() {
               { id: 'today', label: 'Today' },
               { id: 'upcoming', label: 'Upcoming' },
               { id: 'overdue', label: 'Overdue' },
+              { id: 'no_status', label: 'No Status' },
             ].map(view => (
             <button
               key={view.id}

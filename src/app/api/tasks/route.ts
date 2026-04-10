@@ -90,6 +90,8 @@ export async function GET(req: Request) {
     } else if (view === 'overdue') {
       where += ` AND t.due_date IS NOT NULL AND date(t.due_date) < date(?) AND ${notCompletedClause}`
       params.push(today, userId)
+    } else if (view === 'no_status') {
+      where += ' AND t.status_id IS NULL'
     }
   }
 

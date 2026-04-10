@@ -103,6 +103,9 @@ describe('Type contracts', () => {
     }
     expect(full.page).toBe(1)
     expect(full.view).toBe('overdue')
+
+    const noStatus: TaskFilters = { view: 'no_status' }
+    expect(noStatus.view).toBe('no_status')
   })
 
   it('PlatformSettings has all keys', () => {

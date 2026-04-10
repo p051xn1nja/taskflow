@@ -331,6 +331,21 @@ describe('Focus view filtering semantics', () => {
 
     expect(rows.map(r => r.id)).toEqual(['t-overdue-open'])
   })
+
+  it('no_status view returns only tasks without status_id', () => {
+    const { inProgressId } = seedStatuses(db, userId)
+    seedTask(db, userId, { id: 't-no-status', title: 'Legacy task', status_id: null, status: 'in_progress' })
+    seedTask(db, userId, { id: 't-with-status', title: 'Modern task', status_id: inProgressId, status: 'in_progress' })
+
+    const rows = db.prepare(`
+      SELECT id FROM tasks t
+      WHERE t.user_id = ?
+        AND t.status_id IS NULL
+      ORDER BY id
+    `).all(userId) as { id: string }[]
+
+    expect(rows.map(r => r.id)).toEqual(['t-no-status'])
+  })
 })
 
 describe('Reminder query semantics', () => {
