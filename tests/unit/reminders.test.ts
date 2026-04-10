@@ -21,6 +21,15 @@ describe('resolveReminderNotificationStatus', () => {
     })).toBe('unavailable')
   })
 
+  it('returns nothing_due when reminders endpoint reports no pending reminders', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: true,
+      notificationAvailable: true,
+      notificationDispatched: false,
+      notificationReason: 'no_pending_reminders',
+    })).toBe('nothing_due')
+  })
+
   it('returns failed when dispatch result is false', () => {
     expect(resolveReminderNotificationStatus({
       responseOk: true,

@@ -172,6 +172,7 @@ function TasksPageInner() {
         responseOk: true,
         notificationAvailable: data.meta?.notification_available,
         notificationDispatched: data.meta?.notification_dispatched,
+        notificationReason: data.meta?.notification_reason,
       })
       setReminderNotificationStatus(status)
       if (status !== 'sent') return
@@ -602,6 +603,11 @@ function TasksPageInner() {
           {reminderNotificationStatus === 'unavailable' && (
             <span className="text-xs text-surface-600" role="status" aria-live="polite">
               Reminder webhook is not configured
+            </span>
+          )}
+          {reminderNotificationStatus === 'nothing_due' && (
+            <span className="text-xs text-surface-600" role="status" aria-live="polite">
+              No pending reminders to notify
             </span>
           )}
           {reminderWebhookAvailable === false && reminderNotificationStatus === 'idle' && (

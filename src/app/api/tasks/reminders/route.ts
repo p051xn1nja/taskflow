@@ -80,25 +80,34 @@ export async function GET(req: Request) {
   ).all(userId, userId, limit) : []
 
   let notificationDispatched = false
+  let notificationReason: 'not_requested' | 'dispatched' | 'no_webhook_configured' | 'no_pending_reminders' | 'webhook_failed' = 'not_requested'
   const hasAnyReminders = overdueCountRow.total > 0 || dueTodayCountRow.total > 0 || upcomingCountRow.total > 0
-  if (shouldNotify && hasAnyReminders && process.env.REMINDER_WEBHOOK_URL) {
-    try {
-      const res = await fetch(process.env.REMINDER_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          counts: {
-            overdue: overdueCountRow.total,
-            due_today: dueTodayCountRow.total,
-            next_7_days: upcomingCountRow.total,
-          },
-          generated_at: new Date().toISOString(),
-        }),
-      })
-      notificationDispatched = res.ok
-    } catch {
-      notificationDispatched = false
+  if (shouldNotify) {
+    if (!hasAnyReminders) {
+      notificationReason = 'no_pending_reminders'
+    } else if (!process.env.REMINDER_WEBHOOK_URL) {
+      notificationReason = 'no_webhook_configured'
+    } else {
+      try {
+        const res = await fetch(process.env.REMINDER_WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            counts: {
+              overdue: overdueCountRow.total,
+              due_today: dueTodayCountRow.total,
+              next_7_days: upcomingCountRow.total,
+            },
+            generated_at: new Date().toISOString(),
+          }),
+        })
+        notificationDispatched = res.ok
+        notificationReason = res.ok ? 'dispatched' : 'webhook_failed'
+      } catch {
+        notificationDispatched = false
+        notificationReason = 'webhook_failed'
+      }
     }
   }
 
@@ -109,6 +118,7 @@ export async function GET(req: Request) {
       notification_attempted: shouldNotify,
       notification_dispatched: notificationDispatched,
       notification_available: Boolean(process.env.REMINDER_WEBHOOK_URL),
+      notification_reason: notificationReason,
     },
     counts: {
       overdue: overdueCountRow.total,

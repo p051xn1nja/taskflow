@@ -60,6 +60,7 @@ docker compose up -d --build
   - `notification_attempted` (`true` when `notify=1|true` is requested)
   - `notification_dispatched` (`true` only when webhook POST succeeds)
   - `notification_available` (`true` when `REMINDER_WEBHOOK_URL` is configured)
+  - `notification_reason` (`not_requested`, `dispatched`, `no_webhook_configured`, `no_pending_reminders`, `webhook_failed`)
 
 ## Project Structure
 
