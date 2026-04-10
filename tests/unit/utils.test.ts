@@ -135,4 +135,18 @@ describe('parseQuickTaskInput', () => {
       due_date: '2026-05-01',
     })
   })
+
+  it('parses "next monday" keyword', () => {
+    expect(parseQuickTaskInput('Plan sprint next monday', '', now)).toEqual({
+      title: 'Plan sprint',
+      due_date: '2026-04-13',
+    })
+  })
+
+  it('parses "next friday" as one week ahead when today is friday', () => {
+    expect(parseQuickTaskInput('Retro next friday', '', now)).toEqual({
+      title: 'Retro',
+      due_date: '2026-04-17',
+    })
+  })
 })
