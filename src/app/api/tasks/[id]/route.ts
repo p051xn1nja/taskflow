@@ -5,6 +5,32 @@ import { generateId } from '@/lib/utils'
 import { promises as fs } from 'fs'
 import path from 'path'
 import { UPLOADS_PATH } from '@/lib/db'
+import { z } from 'zod'
+
+const UpdateTaskSchema = z.object({
+  title: z.string().trim().min(1).max(120).optional(),
+  description: z.string().max(20_000).optional(),
+  category_id: z.string().optional().nullable(),
+  status: z.enum(['in_progress', 'completed']).optional(),
+  status_id: z.string().optional().nullable(),
+  progress: z.coerce.number().int().min(0).max(100).optional(),
+  start_date: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  board_position: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  location: z.string().max(200).optional(),
+  recurrence: z.enum(['none', 'daily', 'weekly', 'monthly']).optional(),
+  tags: z.array(z.string()).max(10).optional(),
+}).strict()
+
+function shiftDate(dateStr: string | null, recurrence: 'daily' | 'weekly' | 'monthly') {
+  if (!dateStr) return null
+  const d = new Date(dateStr)
+  if (Number.isNaN(d.getTime())) return null
+  if (recurrence === 'daily') d.setDate(d.getDate() + 1)
+  if (recurrence === 'weekly') d.setDate(d.getDate() + 7)
+  if (recurrence === 'monthly') d.setMonth(d.getMonth() + 1)
+  return d.toISOString().slice(0, 10)
+}
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const { error, session } = await requireAuth()
@@ -16,7 +42,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       s.name as status_name, s.color as status_color, s.is_completed as status_is_completed, s.is_default as status_is_default, s.position as status_position
     FROM tasks t
     LEFT JOIN categories c ON t.category_id = c.id
-    LEFT JOIN statuses s ON t.status_id = s.id
+    LEFT JOIN statuses s ON t.status_id = s.id AND s.user_id = t.user_id
     WHERE t.id = ? AND t.user_id = ?
   `).get(params.id, session!.user.id) as Record<string, unknown> | undefined
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -50,10 +76,23 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (error) return error
 
   const db = getDb()
-  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(params.id, session!.user.id) as { id: string } | undefined
+  const task = db.prepare('SELECT * FROM tasks WHERE id = ? AND user_id = ?').get(params.id, session!.user.id) as {
+    id: string
+    recurrence?: 'none' | 'daily' | 'weekly' | 'monthly'
+    title: string
+    description: string
+    category_id: string | null
+    status_id: string | null
+    location: string
+    start_date: string | null
+    due_date: string | null
+  } | undefined
   if (!task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body = await req.json()
+  const parsed = UpdateTaskSchema.safeParse(await req.json())
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  const body = parsed.data
+  const bodyRecord = body as Record<string, unknown>
   const updates: string[] = []
   const values: (string | number | null)[] = []
 
@@ -68,6 +107,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     due_date: 'due_date',
     board_position: 'board_position',
     location: 'location',
+    recurrence: 'recurrence',
   }
 
   // Fields where empty string should become null (nullable fields)
@@ -76,13 +116,15 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   for (const [key, col] of Object.entries(allowedFields)) {
     if (key in body) {
       updates.push(`${col} = ?`)
-      values.push(nullableFields.has(key) && body[key] === '' ? null : body[key])
+      const value = bodyRecord[key]
+      values.push(nullableFields.has(key) && value === '' ? null : (value as string | number | null))
     }
   }
 
   // If status_id changed, sync the legacy status column
   if ('status_id' in body && body.status_id) {
-    const newStatus = db.prepare('SELECT is_completed FROM statuses WHERE id = ?').get(body.status_id) as { is_completed: number } | undefined
+    const newStatus = db.prepare('SELECT is_completed FROM statuses WHERE id = ? AND user_id = ?').get(body.status_id, session!.user.id) as { is_completed: number } | undefined
+    if (!newStatus) return NextResponse.json({ error: 'Invalid status_id' }, { status: 400 })
     if (newStatus) {
       // Only update legacy status if not already being set
       if (!('status' in body)) {
@@ -130,8 +172,33 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     db.prepare(`UPDATE tasks SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`).run(...values)
   }
 
+  // Auto-create next instance when recurring task is marked completed
+  const becameCompleted = body.status === 'completed' || body.progress === 100
+  const recurrence = body.recurrence ?? task.recurrence ?? 'none'
+  if (becameCompleted && recurrence !== 'none') {
+    const defaultStatus = db.prepare(
+      'SELECT id FROM statuses WHERE user_id = ? AND is_default = 1'
+    ).get(session!.user.id) as { id: string } | undefined
+    db.prepare(`
+      INSERT INTO tasks (id, user_id, title, description, category_id, status, status_id, progress, start_date, due_date, location, recurrence)
+      VALUES (?, ?, ?, ?, ?, 'in_progress', ?, 0, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      session!.user.id,
+      task.title,
+      task.description,
+      task.category_id,
+      defaultStatus?.id || null,
+      shiftDate(task.start_date, recurrence as 'daily' | 'weekly' | 'monthly'),
+      shiftDate(task.due_date, recurrence as 'daily' | 'weekly' | 'monthly'),
+      task.location || '',
+      recurrence
+    )
+  }
+
   // Handle tags update
-  if ('tags' in body && Array.isArray(body.tags)) {
+  if (Array.isArray(body.tags)) {
+    const tags = body.tags
     const userId = session!.user.id
     const updateTagsTx = db.transaction(() => {
       db.prepare('DELETE FROM task_tags WHERE task_id = ?').run(params.id)
@@ -140,7 +207,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       const insertTag = db.prepare('INSERT INTO tags (id, user_id, name, color) VALUES (?, ?, ?, ?)')
       const insertTaskTag = db.prepare('INSERT INTO task_tags (id, task_id, tag_id) VALUES (?, ?, ?)')
 
-      for (const tagName of body.tags.slice(0, 10)) {
+      for (const tagName of tags.slice(0, 10)) {
         const trimmed = typeof tagName === 'string' ? tagName.trim().slice(0, 30) : ''
         if (!trimmed) continue
 
