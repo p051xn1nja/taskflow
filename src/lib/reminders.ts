@@ -33,6 +33,8 @@ export function resolveReminderNotificationStatus(input: {
 }): Exclude<ReminderNotificationStatus, 'idle'> {
   if (!input.responseOk) return 'failed'
   if (input.notificationReason === 'no_pending_reminders') return 'nothing_due'
+  if (input.notificationReason === 'no_webhook_configured') return 'unavailable'
+  if (input.notificationReason === 'webhook_failed') return 'failed'
   if (input.notificationAvailable === false) return 'unavailable'
   if (input.notificationDispatched === false) return 'failed'
   return 'sent'
