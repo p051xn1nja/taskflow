@@ -46,6 +46,15 @@ describe('resolveReminderNotificationStatus', () => {
     })).toBe('unavailable')
   })
 
+  it('returns unavailable when no_webhook_configured reason conflicts with dispatched=true', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: true,
+      notificationAvailable: false,
+      notificationReason: 'no_webhook_configured',
+      notificationDispatched: true,
+    })).toBe('unavailable')
+  })
+
   it('returns failed when reason reports webhook dispatch failure', () => {
     expect(resolveReminderNotificationStatus({
       responseOk: true,
