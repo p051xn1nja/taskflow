@@ -2,14 +2,14 @@ import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 
 const ALLOWED_EXTENSIONS = new Set([
   'pdf', 'txt', 'md', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
   'csv', 'json', 'rtf', 'odt',
   'zip', 'rar', '7z', 'tar', 'gz',
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
 ])
 
 const MAX_FILES_PER_NOTE = 10
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     const filename = `${id}.${ext}`
     const buffer = Buffer.from(await file.arrayBuffer())
 
-    fs.writeFileSync(path.join(UPLOADS_PATH, filename), buffer)
+    await fs.writeFile(path.join(UPLOADS_PATH, filename), buffer)
 
     db.prepare(
       'INSERT INTO note_attachments (id, note_id, filename, original_name, mime_type, size) VALUES (?, ?, ?, ?, ?, ?)'
