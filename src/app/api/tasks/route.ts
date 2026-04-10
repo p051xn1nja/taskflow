@@ -77,16 +77,18 @@ export async function GET(req: Request) {
   }
   if (view) {
     const today = new Date().toISOString().slice(0, 10)
+    const notCompletedClause = "(t.status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0) OR (t.status_id IS NULL AND t.status != 'completed'))"
     if (view === 'inbox') {
-      where += ' AND t.start_date IS NULL AND t.due_date IS NULL'
+      where += ` AND t.start_date IS NULL AND t.due_date IS NULL AND ${notCompletedClause}`
+      params.push(userId)
     } else if (view === 'today') {
-      where += " AND ((t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(?) BETWEEN date(t.start_date) AND date(t.due_date)) OR (t.due_date IS NOT NULL AND date(t.due_date) = date(?)) OR (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) = date(?)))"
-      params.push(today, today, today)
+      where += ` AND ((t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(?) BETWEEN date(t.start_date) AND date(t.due_date)) OR (t.due_date IS NOT NULL AND date(t.due_date) = date(?)) OR (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) = date(?))) AND ${notCompletedClause}`
+      params.push(today, today, today, userId)
     } else if (view === 'upcoming') {
-      where += ' AND ((t.due_date IS NOT NULL AND date(t.due_date) > date(?)) OR (t.start_date IS NOT NULL AND date(t.start_date) > date(?)))'
-      params.push(today, today)
+      where += ` AND ((t.due_date IS NOT NULL AND date(t.due_date) > date(?)) OR (t.start_date IS NOT NULL AND date(t.start_date) > date(?))) AND ${notCompletedClause}`
+      params.push(today, today, userId)
     } else if (view === 'overdue') {
-      where += ' AND t.due_date IS NOT NULL AND date(t.due_date) < date(?) AND t.status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0)'
+      where += ` AND t.due_date IS NOT NULL AND date(t.due_date) < date(?) AND ${notCompletedClause}`
       params.push(today, userId)
     }
   }
