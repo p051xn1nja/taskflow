@@ -49,6 +49,9 @@ function TasksPageInner() {
   const [templateName, setTemplateName] = useState('')
   const [templateTitle, setTemplateTitle] = useState('')
   const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false)
+  const [globalQuery, setGlobalQuery] = useState('')
+  const [globalResults, setGlobalResults] = useState<{ tasks: Array<{ id: string; title: string; due_date: string | null; status: string; progress: number }>; notes: Array<{ id: string; title: string; updated_at: string }> }>({ tasks: [], notes: [] })
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -80,6 +83,10 @@ function TasksPageInner() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setShowQuickAdd(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault()
+        setShowGlobalSearch(true)
       }
     }
     window.addEventListener('keydown', handler)
@@ -170,6 +177,20 @@ function TasksPageInner() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showTagDropdown])
+
+  useEffect(() => {
+    if (!showGlobalSearch) return
+    const timer = setTimeout(async () => {
+      if (!globalQuery.trim()) {
+        setGlobalResults({ tasks: [], notes: [] })
+        return
+      }
+      const res = await fetch(`/api/search?q=${encodeURIComponent(globalQuery)}`)
+      if (!res.ok) return
+      setGlobalResults(await res.json())
+    }, 180)
+    return () => clearTimeout(timer)
+  }, [globalQuery, showGlobalSearch])
 
   // ESC to close tag dropdown
   useEffect(() => {
@@ -979,6 +1000,63 @@ function TasksPageInner() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowTemplateModal(false)} className="btn-secondary">Cancel</button>
               <button onClick={createTemplate} className="btn-primary">Save template</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGlobalSearch && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card w-full max-w-2xl p-5 space-y-3 animate-scale-in max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold">Global Search</h3>
+              <button onClick={() => setShowGlobalSearch(false)} className="p-1 rounded hover:bg-surface-300/30 text-surface-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <input
+              type="text"
+              className="input-base"
+              placeholder="Search tasks and notes... (⌘/Ctrl+P)"
+              value={globalQuery}
+              onChange={e => setGlobalQuery(e.target.value)}
+              autoFocus
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-sm font-semibold text-surface-800 mb-2">Tasks</h4>
+                <div className="space-y-1.5">
+                  {globalResults.tasks.map(t => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => { setSearch(t.title); setShowGlobalSearch(false) }}
+                      className="w-full text-left p-2 rounded-lg bg-surface-200/30 hover:bg-surface-200/45"
+                    >
+                      <p className="text-sm text-surface-900 truncate">{t.title}</p>
+                      <p className="text-[11px] text-surface-700">{t.status} · {t.progress}%</p>
+                    </button>
+                  ))}
+                  {globalResults.tasks.length === 0 && <p className="text-xs text-surface-700">No tasks</p>}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-surface-800 mb-2">Notes</h4>
+                <div className="space-y-1.5">
+                  {globalResults.notes.map(n => (
+                    <a
+                      key={n.id}
+                      href={`/notes/${n.id}`}
+                      onClick={() => setShowGlobalSearch(false)}
+                      className="block p-2 rounded-lg bg-surface-200/30 hover:bg-surface-200/45"
+                    >
+                      <p className="text-sm text-surface-900 truncate">{n.title}</p>
+                      <p className="text-[11px] text-surface-700">Updated {new Date(n.updated_at).toLocaleDateString('en-GB')}</p>
+                    </a>
+                  ))}
+                  {globalResults.notes.length === 0 && <p className="text-xs text-surface-700">No notes</p>}
+                </div>
+              </div>
             </div>
           </div>
         </div>
