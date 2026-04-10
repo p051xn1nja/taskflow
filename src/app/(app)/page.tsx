@@ -43,6 +43,8 @@ function TasksPageInner() {
   const [focusView, setFocusView] = useState<'all' | 'inbox' | 'today' | 'upcoming'>('all')
   const [savedViews, setSavedViews] = useState<{ id: string; name: string; filters_json: string }[]>([])
   const [reminders, setReminders] = useState<{ overdue: number; due_today: number; next_7_days: number }>({ overdue: 0, due_today: 0, next_7_days: 0 })
+  const [templates, setTemplates] = useState<Array<{ id: string; name: string; title: string; description: string; category_id: string | null; tags: string[]; recurrence: 'none' | 'daily' | 'weekly' | 'monthly' }>>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -130,6 +132,11 @@ function TasksPageInner() {
     const data = await res.json()
     setReminders(data.counts)
   }
+  const fetchTemplates = async () => {
+    const res = await fetch('/api/task-templates')
+    if (!res.ok) return
+    setTemplates(await res.json())
+  }
 
   useEffect(() => {
     fetchCategories()
@@ -137,6 +144,7 @@ function TasksPageInner() {
     fetchTags()
     fetchSavedViews()
     fetchReminders()
+    fetchTemplates()
   }, [])
 
   useEffect(() => {
@@ -276,6 +284,23 @@ function TasksPageInner() {
   }
 
   const toggleDay = (key: string) => {
+  const applyTemplate = async () => {
+    const tpl = templates.find(t => t.id === selectedTemplateId)
+    if (!tpl) return
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: tpl.title,
+        description: tpl.description,
+        category_id: tpl.category_id,
+        tags: tpl.tags,
+        recurrence: tpl.recurrence,
+      }),
+    })
+    fetchTasks(1)
+  }
+
     setCollapsedDays(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
@@ -359,6 +384,27 @@ function TasksPageInner() {
 
       {/* Stats cards */}
       <div className="flex gap-3 overflow-x-auto pb-1">
+      <div className="card p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-surface-700">Template:</span>
+        <select
+          className="input-base text-sm max-w-[240px]"
+          value={selectedTemplateId}
+          onChange={e => setSelectedTemplateId(e.target.value)}
+        >
+          <option value="">Select template</option>
+          {templates.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={applyTemplate}
+          disabled={!selectedTemplateId}
+          className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-50"
+        >
+          Use template
+        </button>
+      </div>
         {/* Total */}
         <div className="card p-4 min-w-[140px] flex-shrink-0">
           <div className="flex items-center gap-3">
