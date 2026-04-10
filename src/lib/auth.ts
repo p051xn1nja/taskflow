@@ -2,6 +2,7 @@ import type { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { compare } from 'bcryptjs'
 import { getDb } from './db'
+import { checkRateLimit, getClientIdentifier } from './security'
 
 declare module 'next-auth' {
   interface Session {
@@ -42,8 +43,11 @@ export const authOptions: NextAuthOptions = {
         username: { label: 'Username', type: 'text' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.username || !credentials?.password) return null
+        const identifier = getClientIdentifier(req as unknown as Request)
+        const rl = checkRateLimit(`login:${identifier}:${credentials.username.toLowerCase()}`, { limit: 8, windowMs: 60_000 })
+        if (!rl.allowed) return null
 
         const db = getDb()
         const user = db
@@ -118,8 +122,8 @@ export const authOptions: NextAuthOptions = {
   },
   secret: (() => {
     const secret = process.env.NEXTAUTH_SECRET
-    if (!secret && process.env.NODE_ENV === 'production') {
-      console.error('NEXTAUTH_SECRET is not set in production; falling back to insecure development secret')
+    if (process.env.NODE_ENV === 'production' && !secret) {
+      throw new Error('NEXTAUTH_SECRET must be set in production')
     }
     return secret || 'dev-only-secret-not-for-production'
   })(),

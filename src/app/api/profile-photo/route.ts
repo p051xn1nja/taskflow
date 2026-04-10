@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
+import { z } from 'zod'
 
 const ALLOWED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp'])
 const MAX_PHOTO_SIZE = 5 * 1024 * 1024 // 5MB
@@ -41,14 +42,14 @@ export async function POST(req: Request) {
   }
   if (user.profile_photo) {
     const oldPath = path.join(UPLOADS_PATH, user.profile_photo)
-    if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
+    try { await fs.unlink(oldPath) } catch {}
   }
 
   const id = generateId()
   const filename = `profile_${id}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  fs.writeFileSync(path.join(UPLOADS_PATH, filename), buffer)
+  await fs.writeFile(path.join(UPLOADS_PATH, filename), buffer)
 
   db.prepare("UPDATE users SET profile_photo = ?, updated_at = datetime('now') WHERE id = ?").run(filename, targetUserId)
 
@@ -59,7 +60,9 @@ export async function DELETE(req: Request) {
   const { error, session } = await requireAuth()
   if (error) return error
 
-  const { user_id } = await req.json().catch(() => ({ user_id: null }))
+  const body = await req.json().catch(() => ({}))
+  const parsed = z.object({ user_id: z.string().min(1).optional() }).safeParse(body)
+  const user_id = parsed.success ? parsed.data.user_id : undefined
   const targetUserId = user_id && session!.user.role === 'admin' ? user_id : session!.user.id
 
   const db = getDb()
@@ -70,7 +73,7 @@ export async function DELETE(req: Request) {
 
   if (user.profile_photo) {
     const filePath = path.join(UPLOADS_PATH, user.profile_photo)
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    try { await fs.unlink(filePath) } catch {}
     db.prepare("UPDATE users SET profile_photo = '', updated_at = datetime('now') WHERE id = ?").run(targetUserId)
   }
 
