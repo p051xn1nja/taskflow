@@ -580,7 +580,11 @@ function TasksPageInner() {
             title={reminderWebhookAvailable === false ? 'Set REMINDER_WEBHOOK_URL to enable notifications' : undefined}
             className="ml-auto text-xs px-2 py-1 rounded border border-surface-400/40 text-surface-800 hover:bg-surface-200/20 disabled:opacity-60"
           >
-            {sendingReminderNotification ? 'Sending…' : 'Notify now'}
+            {sendingReminderNotification
+              ? 'Sending…'
+              : reminderWebhookAvailable === false
+                ? 'Notify unavailable'
+                : 'Notify now'}
           </button>
           {reminderNotificationStatus === 'sent' && (
             <span className="text-xs text-emerald-300" role="status" aria-live="polite">
