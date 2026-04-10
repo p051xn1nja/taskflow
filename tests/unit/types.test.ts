@@ -21,6 +21,7 @@ describe('Type contracts', () => {
       location: '',
       start_date: null,
       due_date: null,
+      recurrence: 'none',
       board_position: 0,
       created_at: '2025-01-01',
       updated_at: '2025-01-01',
@@ -34,6 +35,11 @@ describe('Type contracts', () => {
   it('Task status only allows valid values', () => {
     const valid: Task['status'][] = ['in_progress', 'completed']
     expect(valid).toHaveLength(2)
+  })
+
+  it('Task recurrence only allows valid values', () => {
+    const valid: Task['recurrence'][] = ['none', 'daily', 'weekly', 'monthly']
+    expect(valid).toHaveLength(4)
   })
 
   it('Category interface has required fields', () => {
