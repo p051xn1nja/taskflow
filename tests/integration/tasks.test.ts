@@ -398,6 +398,40 @@ describe('Reminder query semantics', () => {
     expect(overdue.map(t => t.id)).toEqual(['r-overdue-open'])
     expect(upcoming.map(t => t.id)).toEqual(['r-upcoming-open'])
   })
+
+  it('respects reminder row limit for list queries', () => {
+    const { inProgressId } = seedStatuses(db, userId)
+    seedTask(db, userId, {
+      id: 'r-limit-1',
+      title: 'First overdue',
+      due_date: '2026-04-01',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+    seedTask(db, userId, {
+      id: 'r-limit-2',
+      title: 'Second overdue',
+      due_date: '2026-04-02',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+
+    const openTaskClause = "(status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0) OR (status_id IS NULL AND status != 'completed'))"
+    const limit = 1
+
+    const overdueLimited = db.prepare(`
+      SELECT id FROM tasks
+      WHERE user_id = ?
+        AND ${openTaskClause}
+        AND due_date IS NOT NULL
+        AND date(due_date) < date(?)
+      ORDER BY due_date ASC
+      LIMIT ?
+    `).all(userId, userId, '2026-04-10', limit) as { id: string }[]
+
+    expect(overdueLimited).toHaveLength(1)
+    expect(overdueLimited[0].id).toBe('r-limit-1')
+  })
 })
 
 describe('Kanban column mapping logic', () => {
