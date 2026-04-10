@@ -333,6 +333,58 @@ describe('Focus view filtering semantics', () => {
   })
 })
 
+describe('Reminder query semantics', () => {
+  it('counts only open tasks when using status_id completion state', () => {
+    const { inProgressId, completedId } = seedStatuses(db, userId)
+
+    seedTask(db, userId, {
+      id: 'r-overdue-open',
+      title: 'Open overdue',
+      due_date: '2026-04-01',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+    seedTask(db, userId, {
+      id: 'r-overdue-done',
+      title: 'Done overdue',
+      due_date: '2026-04-01',
+      status_id: completedId,
+      status: 'completed',
+    })
+    seedTask(db, userId, {
+      id: 'r-upcoming-open',
+      title: 'Open upcoming',
+      due_date: '2026-04-15',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+
+    const openTaskClause = "(status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0) OR (status_id IS NULL AND status != 'completed'))"
+
+    const overdue = db.prepare(`
+      SELECT id FROM tasks
+      WHERE user_id = ?
+        AND ${openTaskClause}
+        AND due_date IS NOT NULL
+        AND date(due_date) < date(?)
+      ORDER BY due_date ASC
+    `).all(userId, userId, '2026-04-10') as { id: string }[]
+
+    const upcoming = db.prepare(`
+      SELECT id FROM tasks
+      WHERE user_id = ?
+        AND ${openTaskClause}
+        AND due_date IS NOT NULL
+        AND date(due_date) > date(?)
+        AND date(due_date) <= date(?, '+7 day')
+      ORDER BY due_date ASC
+    `).all(userId, userId, '2026-04-10', '2026-04-10') as { id: string }[]
+
+    expect(overdue.map(t => t.id)).toEqual(['r-overdue-open'])
+    expect(upcoming.map(t => t.id)).toEqual(['r-upcoming-open'])
+  })
+})
+
 describe('Kanban column mapping logic', () => {
   /**
    * The board page derives columns from status + progress:
