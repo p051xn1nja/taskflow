@@ -492,11 +492,35 @@ function TasksPageInner() {
         <div className="card p-3 border border-accent-amber/25 bg-accent-amber/10 flex flex-wrap items-center gap-2">
           <AlertTriangle className="w-4 h-4 text-accent-amber" />
           <p className="text-sm text-surface-900">
-            {reminders.overdue > 0 && <span className="font-semibold">{reminders.overdue} overdue</span>}
+            {reminders.overdue > 0 && (
+              <button
+                type="button"
+                onClick={() => setFocusView('overdue')}
+                className="font-semibold underline decoration-dotted hover:text-white"
+              >
+                {reminders.overdue} overdue
+              </button>
+            )}
             {reminders.overdue > 0 && reminders.due_today > 0 && <span> · </span>}
-            {reminders.due_today > 0 && <span className="font-semibold">{reminders.due_today} due today</span>}
+            {reminders.due_today > 0 && (
+              <button
+                type="button"
+                onClick={() => setFocusView('today')}
+                className="font-semibold underline decoration-dotted hover:text-white"
+              >
+                {reminders.due_today} due today
+              </button>
+            )}
             {(reminders.overdue > 0 || reminders.due_today > 0) && reminders.next_7_days > 0 && <span> · </span>}
-            {reminders.next_7_days > 0 && <span>{reminders.next_7_days} due in next 7 days</span>}
+            {reminders.next_7_days > 0 && (
+              <button
+                type="button"
+                onClick={() => setFocusView('upcoming')}
+                className="underline decoration-dotted hover:text-white"
+              >
+                {reminders.next_7_days} due in next 7 days
+              </button>
+            )}
           </p>
         </div>
       )}
