@@ -48,6 +48,10 @@ export async function GET(req: Request) {
   ).all(userId, userId, limit)
 
   return NextResponse.json({
+    meta: {
+      limit_applied: limit,
+      generated_at: new Date().toISOString(),
+    },
     counts: {
       overdue: overdue.length,
       due_today: dueToday.length,
