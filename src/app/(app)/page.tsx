@@ -45,6 +45,10 @@ function TasksPageInner() {
   const [reminders, setReminders] = useState<{ overdue: number; due_today: number; next_7_days: number }>({ overdue: 0, due_today: 0, next_7_days: 0 })
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; title: string; description: string; category_id: string | null; tags: string[]; recurrence: 'none' | 'daily' | 'weekly' | 'monthly' }>>([])
   const [selectedTemplateId, setSelectedTemplateId] = useState('')
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [templateTitle, setTemplateTitle] = useState('')
+  const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -301,6 +305,34 @@ function TasksPageInner() {
     fetchTasks(1)
   }
 
+  const createTemplate = async () => {
+    const name = templateName.trim()
+    const title = templateTitle.trim()
+    if (!name || !title) return
+    await fetch('/api/task-templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        title,
+        recurrence: templateRecurrence,
+      }),
+    })
+    setShowTemplateModal(false)
+    setTemplateName('')
+    setTemplateTitle('')
+    setTemplateRecurrence('none')
+    fetchTemplates()
+  }
+
+  const deleteSelectedTemplate = async () => {
+    if (!selectedTemplateId) return
+    if (!window.confirm('Delete selected template?')) return
+    await fetch(`/api/task-templates/${selectedTemplateId}`, { method: 'DELETE' })
+    setSelectedTemplateId('')
+    fetchTemplates()
+  }
+
     setCollapsedDays(prev => {
       const next = new Set(prev)
       next.has(key) ? next.delete(key) : next.add(key)
@@ -405,6 +437,21 @@ function TasksPageInner() {
           Use template
         </button>
       </div>
+        <button
+          type="button"
+          onClick={() => setShowTemplateModal(true)}
+          className="btn-secondary text-xs px-3 py-1.5"
+        >
+          New template
+        </button>
+        <button
+          type="button"
+          onClick={deleteSelectedTemplate}
+          disabled={!selectedTemplateId}
+          className="btn-secondary text-xs px-3 py-1.5 text-accent-red border-accent-red/40 disabled:opacity-50"
+        >
+          Delete template
+        </button>
         {/* Total */}
         <div className="card p-4 min-w-[140px] flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -807,3 +854,44 @@ function TasksPageInner() {
     </div>
   )
 }
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="card w-full max-w-md p-5 space-y-3 animate-scale-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-semibold">New Template</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="p-1 rounded hover:bg-surface-300/30 text-surface-700">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <input
+              type="text"
+              className="input-base"
+              placeholder="Template name..."
+              value={templateName}
+              onChange={e => setTemplateName(e.target.value)}
+            />
+            <input
+              type="text"
+              className="input-base"
+              placeholder="Default task title..."
+              value={templateTitle}
+              onChange={e => setTemplateTitle(e.target.value)}
+            />
+            <select
+              className="input-base"
+              value={templateRecurrence}
+              onChange={e => setTemplateRecurrence(e.target.value as 'none' | 'daily' | 'weekly' | 'monthly')}
+            >
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowTemplateModal(false)} className="btn-secondary">Cancel</button>
+              <button onClick={createTemplate} className="btn-primary">Save template</button>
+            </div>
+          </div>
+        </div>
+      )}
