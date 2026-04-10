@@ -52,6 +52,7 @@ function TasksPageInner() {
   const [templateTitle, setTemplateTitle] = useState('')
   const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
   const [sendingReminderNotification, setSendingReminderNotification] = useState(false)
+  const [reminderNotificationStatus, setReminderNotificationStatus] = useState<'idle' | 'sent' | 'failed'>('idle')
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -150,8 +151,15 @@ function TasksPageInner() {
 
   const triggerReminderNotification = async () => {
     setSendingReminderNotification(true)
+    setReminderNotificationStatus('idle')
     try {
-      await fetch('/api/tasks/reminders?include_items=0&notify=1', { cache: 'no-store' })
+      const res = await fetch('/api/tasks/reminders?include_items=0&notify=1', { cache: 'no-store' })
+      if (!res.ok) {
+        setReminderNotificationStatus('failed')
+        return
+      }
+      setReminderNotificationStatus('sent')
+      fetchReminders()
     } finally {
       setSendingReminderNotification(false)
     }
@@ -552,6 +560,12 @@ function TasksPageInner() {
           >
             {sendingReminderNotification ? 'Sending…' : 'Notify now'}
           </button>
+          {reminderNotificationStatus === 'sent' && (
+            <span className="text-xs text-emerald-300">Reminder notifications sent</span>
+          )}
+          {reminderNotificationStatus === 'failed' && (
+            <span className="text-xs text-rose-300">Failed to send reminder notifications</span>
+          )}
         </div>
       )}
 
