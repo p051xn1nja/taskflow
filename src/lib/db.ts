@@ -203,6 +203,8 @@ function initializeSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tasks_status_id ON tasks(status_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_user_created_at ON tasks(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_user_status_id ON tasks(user_id, status_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_due_date ON tasks(user_id, due_date);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_start_date ON tasks(user_id, start_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_category_id ON tasks(category_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
@@ -277,6 +279,8 @@ function initializeSchema(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_tasks_status_id ON tasks(status_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_user_created_at ON tasks(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_user_status_id ON tasks(user_id, status_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_due_date ON tasks(user_id, due_date);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_start_date ON tasks(user_id, start_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_category_id ON tasks(category_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
     CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
