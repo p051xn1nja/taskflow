@@ -13,10 +13,10 @@ const ALLOWED_EXTENSIONS = new Set([
   'pdf', 'txt', 'md', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt',
   'csv', 'json', 'rtf', 'odt',
   'zip', 'rar', '7z', 'tar', 'gz',
-  'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp',
+  'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp',
 ])
 
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'])
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
 const ARCHIVE_EXTENSIONS = new Set(['zip', 'rar', '7z', 'tar', 'gz'])
 const SPREADSHEET_EXTENSIONS = new Set(['xlsx', 'xls', 'csv'])
 
@@ -44,6 +44,7 @@ interface TaskFormProps {
     start_date: string | null
     due_date: string | null
     location: string
+    recurrence?: 'none' | 'daily' | 'weekly' | 'monthly'
     progress?: number
   }) => Promise<string | void> | void
   onCancel: () => void
@@ -60,6 +61,7 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
   const [location, setLocation] = useState(task?.location || '')
   const [startDate, setStartDate] = useState(task?.start_date || defaultStartDate || '')
   const [dueDate, setDueDate] = useState(task?.due_date || defaultDueDate || '')
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>(task?.recurrence || 'none')
   const [progress, setProgress] = useState(task?.progress ?? 0)
 
   // Tag autocomplete
@@ -206,6 +208,7 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
       start_date: startDate || null,
       due_date: dueDate || null,
       location: location.trim(),
+      recurrence,
       ...(isEditing ? { progress } : {}),
     })
 
@@ -332,6 +335,20 @@ export function TaskForm({ task, categories, defaultStartDate, defaultDueDate, o
                 onChange={e => setDueDate(e.target.value)}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-800 mb-1.5">Recurrence</label>
+            <select
+              className="input-base"
+              value={recurrence}
+              onChange={e => setRecurrence(e.target.value as 'none' | 'daily' | 'weekly' | 'monthly')}
+            >
+              <option value="none">Does not repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </div>
 
           {/* Progress (edit mode only) */}

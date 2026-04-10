@@ -44,6 +44,7 @@ export interface Task {
   location: string
   start_date: string | null
   due_date: string | null
+  recurrence: 'none' | 'daily' | 'weekly' | 'monthly'
   board_position: number
   created_at: string
   updated_at: string
@@ -124,6 +125,15 @@ export interface TaskFilters {
   date_to?: string
   page?: number
   per_page?: number
+  view?: 'all' | 'inbox' | 'today' | 'upcoming' | 'overdue' | 'no_status'
+}
+
+export interface TaskView {
+  id: string
+  user_id: string
+  name: string
+  filters_json: string
+  created_at: string
 }
 
 export interface NoteFilters {
