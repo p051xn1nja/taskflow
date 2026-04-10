@@ -136,7 +136,7 @@ function TasksPageInner() {
     setSavedViews(await res.json())
   }
   const fetchReminders = async () => {
-    const res = await fetch('/api/tasks/reminders')
+    const res = await fetch('/api/tasks/reminders?include_items=0')
     if (!res.ok) return
     const data = await res.json()
     setReminders(data.counts)
