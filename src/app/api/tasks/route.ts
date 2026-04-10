@@ -85,6 +85,9 @@ export async function GET(req: Request) {
     } else if (view === 'upcoming') {
       where += ' AND ((t.due_date IS NOT NULL AND date(t.due_date) > date(?)) OR (t.start_date IS NOT NULL AND date(t.start_date) > date(?)))'
       params.push(today, today)
+    } else if (view === 'overdue') {
+      where += ' AND t.due_date IS NOT NULL AND date(t.due_date) < date(?) AND t.status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0)'
+      params.push(today, userId)
     }
   }
 

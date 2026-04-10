@@ -125,7 +125,7 @@ export interface TaskFilters {
   date_to?: string
   page?: number
   per_page?: number
-  view?: 'all' | 'inbox' | 'today' | 'upcoming'
+  view?: 'all' | 'inbox' | 'today' | 'upcoming' | 'overdue'
 }
 
 export interface TaskView {

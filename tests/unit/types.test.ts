@@ -99,8 +99,10 @@ describe('Type contracts', () => {
       date_to: '2025-12-31',
       page: 1,
       per_page: 50,
+      view: 'overdue',
     }
     expect(full.page).toBe(1)
+    expect(full.view).toBe('overdue')
   })
 
   it('PlatformSettings has all keys', () => {

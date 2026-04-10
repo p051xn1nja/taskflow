@@ -23,6 +23,8 @@ export default function TasksPage() {
 }
 
 function TasksPageInner() {
+  type FocusView = 'all' | 'inbox' | 'today' | 'upcoming' | 'overdue'
+
   const { data: session } = useSession()
   const searchParams = useSearchParams()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -40,7 +42,7 @@ function TasksPageInner() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const [focusView, setFocusView] = useState<'all' | 'inbox' | 'today' | 'upcoming'>('all')
+  const [focusView, setFocusView] = useState<FocusView>('all')
   const [savedViews, setSavedViews] = useState<{ id: string; name: string; filters_json: string }[]>([])
   const [reminders, setReminders] = useState<{ overdue: number; due_today: number; next_7_days: number }>({ overdue: 0, due_today: 0, next_7_days: 0 })
   const [templates, setTemplates] = useState<Array<{ id: string; name: string; title: string; description: string; category_id: string | null; tags: string[]; recurrence: 'none' | 'daily' | 'weekly' | 'monthly' }>>([])
@@ -276,7 +278,7 @@ function TasksPageInner() {
       tag?: string
       date_from?: string
       date_to?: string
-      view?: 'all' | 'inbox' | 'today' | 'upcoming'
+      view?: FocusView
     }
     setSearch(f.search || '')
     setFilterCategory(f.category_id || '')
@@ -549,12 +551,13 @@ function TasksPageInner() {
       {/* Search & Filters */}
       <div className="card p-4 space-y-3 relative z-10">
         <div className="flex flex-wrap gap-2">
-          {[
-            { id: 'all', label: 'All' },
-            { id: 'inbox', label: 'Inbox' },
-            { id: 'today', label: 'Today' },
-            { id: 'upcoming', label: 'Upcoming' },
-          ].map(view => (
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'inbox', label: 'Inbox' },
+              { id: 'today', label: 'Today' },
+              { id: 'upcoming', label: 'Upcoming' },
+              { id: 'overdue', label: 'Overdue' },
+            ].map(view => (
             <button
               key={view.id}
               type="button"
@@ -564,7 +567,7 @@ function TasksPageInner() {
                   ? 'bg-brand-600/15 text-brand-300 border-brand-500/40'
                   : 'bg-surface-200/20 text-surface-700 border-surface-300/30 hover:bg-surface-200/35',
               )}
-              onClick={() => setFocusView(view.id as 'all' | 'inbox' | 'today' | 'upcoming')}
+              onClick={() => setFocusView(view.id as FocusView)}
             >
               {view.label}
             </button>
