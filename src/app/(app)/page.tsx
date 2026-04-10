@@ -163,9 +163,13 @@ function TasksPageInner() {
     setReminderNotificationStatus('idle')
     try {
       const res = await fetch('/api/tasks/reminders?include_items=0&notify=1', { cache: 'no-store' })
+      if (!res.ok) {
+        setReminderNotificationStatus(resolveReminderNotificationStatus({ responseOk: false }))
+        return
+      }
       const data = await res.json() as { meta?: { notification_dispatched?: boolean; notification_available?: boolean } }
       const status = resolveReminderNotificationStatus({
-        responseOk: res.ok,
+        responseOk: true,
         notificationAvailable: data.meta?.notification_available,
         notificationDispatched: data.meta?.notification_dispatched,
       })
