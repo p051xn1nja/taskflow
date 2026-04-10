@@ -20,17 +20,21 @@ const CreateTaskSchema = z.object({
 
 const TaskViewParamSchema = z.enum(['inbox', 'today', 'upcoming', 'overdue', 'no_status'])
 const YmdDateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+const SearchParamSchema = z.string().trim().max(120)
+const TagParamSchema = z.string().trim().max(60)
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
   if (error) return error
 
   const url = new URL(req.url)
-  const search = url.searchParams.get('search') || ''
+  const rawSearch = url.searchParams.get('search')
+  const search = rawSearch && SearchParamSchema.safeParse(rawSearch).success ? rawSearch.trim() : ''
   const categoryId = url.searchParams.get('category_id') || ''
   const status = url.searchParams.get('status') || ''
   const statusId = url.searchParams.get('status_id') || ''
-  const tag = url.searchParams.get('tag') || ''
+  const rawTag = url.searchParams.get('tag')
+  const tag = rawTag && TagParamSchema.safeParse(rawTag).success ? rawTag.trim() : ''
   const rawView = url.searchParams.get('view')
   const view = rawView ? (TaskViewParamSchema.safeParse(rawView).success ? rawView : '') : ''
   const rawDateFrom = url.searchParams.get('date_from')
