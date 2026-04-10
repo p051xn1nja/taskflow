@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import {
   Plus, Search, Filter, ChevronDown, ChevronRight, X,
-  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot, Bookmark, Trash2,
+  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot, Bookmark, Trash2, Bell, AlertTriangle,
 } from 'lucide-react'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
@@ -42,6 +42,12 @@ function TasksPageInner() {
   const [showFilters, setShowFilters] = useState(false)
   const [focusView, setFocusView] = useState<'all' | 'inbox' | 'today' | 'upcoming'>('all')
   const [savedViews, setSavedViews] = useState<{ id: string; name: string; filters_json: string }[]>([])
+  const [reminders, setReminders] = useState<{
+    counts: { overdue: number; due_today: number; due_tomorrow: number }
+    overdue: { id: string; title: string; due_date: string }[]
+    due_today: { id: string; title: string; due_date: string }[]
+    due_tomorrow: { id: string; title: string; due_date: string }[]
+  } | null>(null)
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -122,12 +128,22 @@ function TasksPageInner() {
     const res = await fetch('/api/task-views')
     setSavedViews(await res.json())
   }
+  const fetchReminders = async () => {
+    const res = await fetch('/api/tasks/reminders')
+    setReminders(await res.json())
+  }
 
   useEffect(() => {
     fetchCategories()
     fetchStatuses()
     fetchTags()
     fetchSavedViews()
+    fetchReminders()
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => { fetchReminders() }, 60_000)
+    return () => clearInterval(id)
   }, [])
 
   useEffect(() => {
@@ -380,6 +396,47 @@ function TasksPageInner() {
           </div>
         </div>
       </div>
+
+      {/* Reminder strip */}
+      {reminders && (reminders.counts.overdue > 0 || reminders.counts.due_today > 0 || reminders.counts.due_tomorrow > 0) && (
+        <div className="card p-3 border border-accent-amber/30 bg-accent-amber/5">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-accent-amber">
+              <Bell className="w-3.5 h-3.5" />
+              Reminders
+            </div>
+            {reminders.counts.overdue > 0 && (
+              <button
+                type="button"
+                onClick={() => { setFocusView('all'); setFilterStatus(''); setDateFrom(''); setDateTo('') }}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-accent-red/15 text-accent-red border border-accent-red/30"
+                title="Overdue tasks need attention"
+              >
+                <AlertTriangle className="w-3 h-3" />
+                {reminders.counts.overdue} overdue
+              </button>
+            )}
+            {reminders.counts.due_today > 0 && (
+              <button
+                type="button"
+                onClick={() => setFocusView('today')}
+                className="px-2 py-1 rounded-md text-xs bg-brand-600/15 text-brand-300 border border-brand-500/40"
+              >
+                {reminders.counts.due_today} due today
+              </button>
+            )}
+            {reminders.counts.due_tomorrow > 0 && (
+              <button
+                type="button"
+                onClick={() => setFocusView('upcoming')}
+                className="px-2 py-1 rounded-md text-xs bg-surface-200/30 text-surface-800 border border-surface-300/30"
+              >
+                {reminders.counts.due_tomorrow} due tomorrow
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="card p-4 space-y-3 relative z-10">
