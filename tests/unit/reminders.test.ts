@@ -22,6 +22,14 @@ describe('resolveReminderNotificationStatus', () => {
     })).toBe('failed')
   })
 
+  it('prioritizes failed status over no_webhook_configured when response is not ok', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: false,
+      notificationAvailable: false,
+      notificationReason: 'no_webhook_configured',
+    })).toBe('failed')
+  })
+
   it('returns unavailable when webhook is unavailable', () => {
     expect(resolveReminderNotificationStatus({
       responseOk: true,
