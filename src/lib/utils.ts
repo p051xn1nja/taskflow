@@ -43,3 +43,43 @@ export function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<strin
     return groups
   }, {} as Record<string, T[]>)
 }
+
+export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new Date()): { title: string; due_date: string | null } {
+  let title = raw.trim()
+  let due: string | null = fallbackDueDate || null
+  const toYmd = (d: Date) => d.toISOString().slice(0, 10)
+  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+
+  const nextWeekday = (from: Date, targetDay: number) => {
+    const d = new Date(from)
+    const delta = (targetDay - d.getDay() + 7) % 7 || 7
+    d.setDate(d.getDate() + delta)
+    return d
+  }
+
+  if (/\btoday\b/i.test(title)) {
+    due = toYmd(now)
+    title = title.replace(/\btoday\b/ig, '').trim()
+  } else if (/\btomorrow\b/i.test(title)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 1)
+    due = toYmd(d)
+    title = title.replace(/\btomorrow\b/ig, '').trim()
+  } else if (/\bnext week\b/i.test(title)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 7)
+    due = toYmd(d)
+    title = title.replace(/\bnext week\b/ig, '').trim()
+  } else {
+    const weekdayPattern = /\bnext (sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i
+    const match = title.match(weekdayPattern)
+    if (match) {
+      const weekday = match[1].toLowerCase() as typeof weekdays[number]
+      due = toYmd(nextWeekday(now, weekdays.indexOf(weekday)))
+      title = title.replace(weekdayPattern, '').trim()
+    }
+  }
+
+  title = title.replace(/\s{2,}/g, ' ').trim()
+  return { title, due_date: due }
+}

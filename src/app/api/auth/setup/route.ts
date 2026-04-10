@@ -2,6 +2,15 @@ import { NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { getDb } from '@/lib/db'
 import { generateId } from '@/lib/utils'
+import { z } from 'zod'
+import { checkRateLimit, getClientIdentifier } from '@/lib/security'
+
+const SetupSchema = z.object({
+  username: z.string().trim().min(3).max(30),
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8).max(128),
+  display_name: z.string().trim().min(1).max(60).optional(),
+})
 
 export async function GET() {
   const db = getDb()
@@ -10,6 +19,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const identifier = getClientIdentifier(req)
+  const rl = checkRateLimit(`setup:${identifier}`, { limit: 6, windowMs: 60_000 })
+  if (!rl.allowed) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   const db = getDb()
   const count = db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }
 
@@ -22,23 +37,17 @@ export async function POST(req: Request) {
     }
   }
 
-  const body = await req.json()
-  const { username, email, password, display_name } = body
-
-  if (!username || !email || !password) {
-    return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
+  const parsed = SetupSchema.safeParse(await req.json())
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
   }
 
-  if (username.length < 3 || username.length > 30) {
-    return NextResponse.json({ error: 'Username must be 3-30 characters' }, { status: 400 })
-  }
-
-  if (password.length < 8) {
-    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
-  }
+  const { username, email, password, display_name } = parsed.data
 
   // Check for existing user
-  const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email)
+  const existing = db.prepare(
+    'SELECT id FROM users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE'
+  ).get(username, email)
   if (existing) {
     return NextResponse.json({ error: 'Username or email already exists' }, { status: 409 })
   }

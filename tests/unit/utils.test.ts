@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, generateId, formatDate, formatDateTime, formatFileSize, groupBy } from '@/lib/utils'
+import { cn, generateId, formatDate, formatDateTime, formatFileSize, groupBy, parseQuickTaskInput } from '@/lib/utils'
 
 describe('cn (class name merger)', () => {
   it('merges class names', () => {
@@ -102,5 +102,51 @@ describe('groupBy', () => {
   it('handles single group', () => {
     const result = groupBy([1, 2, 3], () => 'all')
     expect(result).toEqual({ all: [1, 2, 3] })
+  })
+})
+
+describe('parseQuickTaskInput', () => {
+  const now = new Date('2026-04-10T12:00:00.000Z')
+
+  it('parses "today" keyword into due date and strips keyword from title', () => {
+    expect(parseQuickTaskInput('Pay rent today', '', now)).toEqual({
+      title: 'Pay rent',
+      due_date: '2026-04-10',
+    })
+  })
+
+  it('parses "tomorrow" keyword', () => {
+    expect(parseQuickTaskInput('Call mom tomorrow', '', now)).toEqual({
+      title: 'Call mom',
+      due_date: '2026-04-11',
+    })
+  })
+
+  it('parses "next week" keyword', () => {
+    expect(parseQuickTaskInput('Submit report next week', '', now)).toEqual({
+      title: 'Submit report',
+      due_date: '2026-04-17',
+    })
+  })
+
+  it('falls back to selected due date when no keyword exists', () => {
+    expect(parseQuickTaskInput('Read docs', '2026-05-01', now)).toEqual({
+      title: 'Read docs',
+      due_date: '2026-05-01',
+    })
+  })
+
+  it('parses "next monday" keyword', () => {
+    expect(parseQuickTaskInput('Plan sprint next monday', '', now)).toEqual({
+      title: 'Plan sprint',
+      due_date: '2026-04-13',
+    })
+  })
+
+  it('parses "next friday" as one week ahead when today is friday', () => {
+    expect(parseQuickTaskInput('Retro next friday', '', now)).toEqual({
+      title: 'Retro',
+      due_date: '2026-04-17',
+    })
   })
 })
