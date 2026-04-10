@@ -53,6 +53,7 @@ function TasksPageInner() {
   const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
   const [sendingReminderNotification, setSendingReminderNotification] = useState(false)
   const [reminderNotificationStatus, setReminderNotificationStatus] = useState<'idle' | 'sent' | 'failed' | 'unavailable'>('idle')
+  const [reminderWebhookAvailable, setReminderWebhookAvailable] = useState<boolean | null>(null)
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -140,7 +141,10 @@ function TasksPageInner() {
   const fetchReminders = async () => {
     const res = await fetch('/api/tasks/reminders?include_items=0')
     if (!res.ok) return
-    const data = await res.json()
+    const data = await res.json() as { counts: { overdue: number; due_today: number; next_7_days: number }; meta?: { notification_available?: boolean } }
+    if (typeof data.meta?.notification_available === 'boolean') {
+      setReminderWebhookAvailable(data.meta.notification_available)
+    }
     setReminders(data.counts)
   }
   const fetchTemplates = async () => {
@@ -572,7 +576,8 @@ function TasksPageInner() {
           <button
             type="button"
             onClick={triggerReminderNotification}
-            disabled={sendingReminderNotification}
+            disabled={sendingReminderNotification || reminderWebhookAvailable === false}
+            title={reminderWebhookAvailable === false ? 'Set REMINDER_WEBHOOK_URL to enable notifications' : undefined}
             className="ml-auto text-xs px-2 py-1 rounded border border-surface-400/40 text-surface-800 hover:bg-surface-200/20 disabled:opacity-60"
           >
             {sendingReminderNotification ? 'Sending…' : 'Notify now'}
@@ -590,6 +595,11 @@ function TasksPageInner() {
           {reminderNotificationStatus === 'unavailable' && (
             <span className="text-xs text-surface-600" role="status" aria-live="polite">
               Reminder webhook is not configured
+            </span>
+          )}
+          {reminderWebhookAvailable === false && reminderNotificationStatus === 'idle' && (
+            <span className="text-xs text-surface-600" role="status" aria-live="polite">
+              Set REMINDER_WEBHOOK_URL to enable notifications
             </span>
           )}
         </div>
