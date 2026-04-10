@@ -63,6 +63,15 @@ describe('resolveReminderNotificationStatus', () => {
     })).toBe('sent')
   })
 
+  it('returns failed when not_requested is paired with dispatch=false', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: true,
+      notificationAvailable: true,
+      notificationReason: 'not_requested',
+      notificationDispatched: false,
+    })).toBe('failed')
+  })
+
   it('returns failed when dispatch result is false', () => {
     expect(resolveReminderNotificationStatus({
       responseOk: true,
