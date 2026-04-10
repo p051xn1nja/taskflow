@@ -83,3 +83,10 @@ export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new
   title = title.replace(/\s{2,}/g, ' ').trim()
   return { title, due_date: due }
 }
+
+export function parsePositiveInt(value: string | null | undefined, fallback: number, max?: number): number {
+  const parsed = Number.parseInt(value ?? '', 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  if (typeof max === 'number') return Math.min(parsed, max)
+  return parsed
+}

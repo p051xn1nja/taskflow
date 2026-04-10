@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cn, generateId, formatDate, formatDateTime, formatFileSize, groupBy, parseQuickTaskInput } from '@/lib/utils'
+import { cn, generateId, formatDate, formatDateTime, formatFileSize, groupBy, parseQuickTaskInput, parsePositiveInt } from '@/lib/utils'
 
 describe('cn (class name merger)', () => {
   it('merges class names', () => {
@@ -148,5 +148,23 @@ describe('parseQuickTaskInput', () => {
       title: 'Retro',
       due_date: '2026-04-17',
     })
+  })
+})
+
+describe('parsePositiveInt', () => {
+  it('returns fallback for invalid values', () => {
+    expect(parsePositiveInt(undefined, 5)).toBe(5)
+    expect(parsePositiveInt(null, 5)).toBe(5)
+    expect(parsePositiveInt('abc', 5)).toBe(5)
+    expect(parsePositiveInt('-2', 5)).toBe(5)
+    expect(parsePositiveInt('0', 5)).toBe(5)
+  })
+
+  it('parses valid positive integers', () => {
+    expect(parsePositiveInt('7', 1)).toBe(7)
+  })
+
+  it('applies max bound when provided', () => {
+    expect(parsePositiveInt('250', 50, 200)).toBe(200)
   })
 })

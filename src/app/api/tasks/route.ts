@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getDb, ensureDefaultStatuses } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
-import { generateId } from '@/lib/utils'
+import { generateId, parsePositiveInt } from '@/lib/utils'
 import { getPlatformSettings } from '@/lib/platform-settings'
 import type { Task } from '@/types'
 import { z } from 'zod'
@@ -34,8 +34,8 @@ export async function GET(req: Request) {
   const view = rawView ? (TaskViewParamSchema.safeParse(rawView).success ? rawView : '') : ''
   const dateFrom = url.searchParams.get('date_from') || ''
   const dateTo = url.searchParams.get('date_to') || ''
-  const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'))
-  const perPage = Math.min(200, Math.max(1, parseInt(url.searchParams.get('per_page') || '50')))
+  const page = parsePositiveInt(url.searchParams.get('page'), 1)
+  const perPage = parsePositiveInt(url.searchParams.get('per_page'), 50, 200)
 
   const db = getDb()
   const userId = session!.user.id
