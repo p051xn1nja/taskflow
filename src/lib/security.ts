@@ -11,6 +11,11 @@ export function checkRateLimit(key: string, options?: { limit?: number; windowMs
   const limit = options?.limit ?? 10
   const windowMs = options?.windowMs ?? 60_000
   const now = Date.now()
+  if (buckets.size > 1000) {
+    for (const [bucketKey, bucketValue] of buckets) {
+      if (bucketValue.resetAt <= now) buckets.delete(bucketKey)
+    }
+  }
   const bucket = buckets.get(key)
 
   if (!bucket || bucket.resetAt <= now) {
@@ -60,4 +65,8 @@ export function sanitizeRichHtml(input: string) {
 
 export function isSafeProfileFilename(filename: string) {
   return /^profile_[a-f0-9]{24}\.(png|jpe?g|gif|webp)$/i.test(filename)
+}
+
+export function __resetRateLimitBucketsForTests() {
+  buckets.clear()
 }
