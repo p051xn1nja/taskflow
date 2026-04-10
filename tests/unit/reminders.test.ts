@@ -38,6 +38,15 @@ describe('resolveReminderNotificationStatus', () => {
     })).toBe('nothing_due')
   })
 
+  it('returns nothing_due when no_pending_reminders conflicts with unavailable metadata', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: true,
+      notificationAvailable: false,
+      notificationDispatched: false,
+      notificationReason: 'no_pending_reminders',
+    })).toBe('nothing_due')
+  })
+
   it('returns unavailable when reason reports missing webhook configuration', () => {
     expect(resolveReminderNotificationStatus({
       responseOk: true,
