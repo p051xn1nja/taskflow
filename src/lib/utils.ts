@@ -54,6 +54,26 @@ export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new
     return `${year}-${month}-${day}`
   }
   const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const weekdayAliases: Record<string, typeof weekdays[number]> = {
+    sun: 'sunday',
+    sunday: 'sunday',
+    mon: 'monday',
+    monday: 'monday',
+    tue: 'tuesday',
+    tues: 'tuesday',
+    tuesday: 'tuesday',
+    wed: 'wednesday',
+    weds: 'wednesday',
+    wednesday: 'wednesday',
+    thu: 'thursday',
+    thur: 'thursday',
+    thurs: 'thursday',
+    thursday: 'thursday',
+    fri: 'friday',
+    friday: 'friday',
+    sat: 'saturday',
+    saturday: 'saturday',
+  }
 
   const nextWeekday = (from: Date, targetDay: number) => {
     const d = new Date(from)
@@ -90,11 +110,13 @@ export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new
     due = toYmd(d)
     title = title.replace(/\bnext month\b/ig, '').trim()
   } else {
-    const weekdayPattern = /\bnext (sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/i
+    const weekdayPattern = /\bnext (sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday|s)?|thu(?:rsday|r|rs)?|fri(?:day)?|sat(?:urday)?)\b/i
     const match = title.match(weekdayPattern)
     if (match) {
-      const weekday = match[1].toLowerCase() as typeof weekdays[number]
-      due = toYmd(nextWeekday(now, weekdays.indexOf(weekday)))
+      const weekday = weekdayAliases[match[1].toLowerCase()]
+      if (weekday) {
+        due = toYmd(nextWeekday(now, weekdays.indexOf(weekday)))
+      }
       title = title.replace(weekdayPattern, '').trim()
     }
   }

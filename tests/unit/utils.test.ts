@@ -172,6 +172,13 @@ describe('parseQuickTaskInput', () => {
       due_date: '2026-04-17',
     })
   })
+
+  it('parses abbreviated weekday keyword', () => {
+    expect(parseQuickTaskInput('Sync next fri', '', now)).toEqual({
+      title: 'Sync',
+      due_date: '2026-04-17',
+    })
+  })
 })
 
 describe('parsePositiveInt', () => {
