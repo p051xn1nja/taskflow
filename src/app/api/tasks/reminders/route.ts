@@ -108,6 +108,7 @@ export async function GET(req: Request) {
       generated_at: new Date().toISOString(),
       notification_attempted: shouldNotify,
       notification_dispatched: notificationDispatched,
+      notification_available: Boolean(process.env.REMINDER_WEBHOOK_URL),
     },
     counts: {
       overdue: overdueCountRow.total,

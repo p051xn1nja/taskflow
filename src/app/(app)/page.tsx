@@ -52,7 +52,7 @@ function TasksPageInner() {
   const [templateTitle, setTemplateTitle] = useState('')
   const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
   const [sendingReminderNotification, setSendingReminderNotification] = useState(false)
-  const [reminderNotificationStatus, setReminderNotificationStatus] = useState<'idle' | 'sent' | 'failed'>('idle')
+  const [reminderNotificationStatus, setReminderNotificationStatus] = useState<'idle' | 'sent' | 'failed' | 'unavailable'>('idle')
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -158,7 +158,11 @@ function TasksPageInner() {
         setReminderNotificationStatus('failed')
         return
       }
-      const data = await res.json() as { meta?: { notification_dispatched?: boolean } }
+      const data = await res.json() as { meta?: { notification_dispatched?: boolean; notification_available?: boolean } }
+      if (data.meta?.notification_available === false) {
+        setReminderNotificationStatus('unavailable')
+        return
+      }
       if (data.meta?.notification_dispatched === false) {
         setReminderNotificationStatus('failed')
         return
@@ -581,6 +585,11 @@ function TasksPageInner() {
           {reminderNotificationStatus === 'failed' && (
             <span className="text-xs text-rose-300" role="alert" aria-live="assertive">
               Failed to send reminder notifications
+            </span>
+          )}
+          {reminderNotificationStatus === 'unavailable' && (
+            <span className="text-xs text-surface-600" role="status" aria-live="polite">
+              Reminder webhook is not configured
             </span>
           )}
         </div>
