@@ -79,12 +79,12 @@ export async function GET(req: Request) {
     }
   }
   if (dateFrom) {
-    where += ' AND date(t.created_at) >= ?'
-    params.push(dateFrom)
+    where += ' AND t.created_at >= ?'
+    params.push(`${dateFrom} 00:00:00`)
   }
   if (dateTo) {
-    where += ' AND date(t.created_at) <= ?'
-    params.push(dateTo)
+    where += ' AND t.created_at <= ?'
+    params.push(`${dateTo} 23:59:59`)
   }
   if (tag) {
     where += ' AND t.id IN (SELECT tt.task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = ?)'
@@ -97,13 +97,13 @@ export async function GET(req: Request) {
       where += ` AND t.start_date IS NULL AND t.due_date IS NULL AND ${notCompletedClause}`
       params.push(userId)
     } else if (view === 'today') {
-      where += ` AND ((t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(?) BETWEEN date(t.start_date) AND date(t.due_date)) OR (t.due_date IS NOT NULL AND date(t.due_date) = date(?)) OR (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) = date(?))) AND ${notCompletedClause}`
-      params.push(today, today, today, userId)
+      where += ` AND ((t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND t.start_date <= ? AND t.due_date >= ?) OR (t.due_date IS NOT NULL AND t.due_date = ?) OR (t.start_date IS NOT NULL AND t.due_date IS NULL AND t.start_date = ?)) AND ${notCompletedClause}`
+      params.push(today, today, today, today, userId)
     } else if (view === 'upcoming') {
-      where += ` AND ((t.due_date IS NOT NULL AND date(t.due_date) > date(?)) OR (t.start_date IS NOT NULL AND date(t.start_date) > date(?))) AND ${notCompletedClause}`
+      where += ` AND ((t.due_date IS NOT NULL AND t.due_date > ?) OR (t.start_date IS NOT NULL AND t.start_date > ?)) AND ${notCompletedClause}`
       params.push(today, today, userId)
     } else if (view === 'overdue') {
-      where += ` AND t.due_date IS NOT NULL AND date(t.due_date) < date(?) AND ${notCompletedClause}`
+      where += ` AND t.due_date IS NOT NULL AND t.due_date < ? AND ${notCompletedClause}`
       params.push(today, userId)
     } else if (view === 'no_status') {
       where += ' AND t.status_id IS NULL'
