@@ -12,6 +12,7 @@ import { TaskForm } from '@/components/TaskForm'
 import { Pagination } from '@/components/Pagination'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { cn, groupBy, parseQuickTaskInput } from '@/lib/utils'
+import { resolveReminderNotificationStatus, type ReminderNotificationStatus } from '@/lib/reminders'
 import type { Task, Category, Status, Tag as TagType } from '@/types'
 
 export default function TasksPage() {
@@ -52,7 +53,7 @@ function TasksPageInner() {
   const [templateTitle, setTemplateTitle] = useState('')
   const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
   const [sendingReminderNotification, setSendingReminderNotification] = useState(false)
-  const [reminderNotificationStatus, setReminderNotificationStatus] = useState<'idle' | 'sent' | 'failed' | 'unavailable'>('idle')
+  const [reminderNotificationStatus, setReminderNotificationStatus] = useState<ReminderNotificationStatus>('idle')
   const [reminderWebhookAvailable, setReminderWebhookAvailable] = useState<boolean | null>(null)
 
   // Tag filter search
@@ -162,20 +163,14 @@ function TasksPageInner() {
     setReminderNotificationStatus('idle')
     try {
       const res = await fetch('/api/tasks/reminders?include_items=0&notify=1', { cache: 'no-store' })
-      if (!res.ok) {
-        setReminderNotificationStatus('failed')
-        return
-      }
       const data = await res.json() as { meta?: { notification_dispatched?: boolean; notification_available?: boolean } }
-      if (data.meta?.notification_available === false) {
-        setReminderNotificationStatus('unavailable')
-        return
-      }
-      if (data.meta?.notification_dispatched === false) {
-        setReminderNotificationStatus('failed')
-        return
-      }
-      setReminderNotificationStatus('sent')
+      const status = resolveReminderNotificationStatus({
+        responseOk: res.ok,
+        notificationAvailable: data.meta?.notification_available,
+        notificationDispatched: data.meta?.notification_dispatched,
+      })
+      setReminderNotificationStatus(status)
+      if (status !== 'sent') return
       fetchReminders()
     } catch {
       setReminderNotificationStatus('failed')
