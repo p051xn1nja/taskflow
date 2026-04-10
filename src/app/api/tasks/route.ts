@@ -19,6 +19,7 @@ const CreateTaskSchema = z.object({
 })
 
 const TaskViewParamSchema = z.enum(['inbox', 'today', 'upcoming', 'overdue', 'no_status'])
+const YmdDateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
@@ -32,8 +33,10 @@ export async function GET(req: Request) {
   const tag = url.searchParams.get('tag') || ''
   const rawView = url.searchParams.get('view')
   const view = rawView ? (TaskViewParamSchema.safeParse(rawView).success ? rawView : '') : ''
-  const dateFrom = url.searchParams.get('date_from') || ''
-  const dateTo = url.searchParams.get('date_to') || ''
+  const rawDateFrom = url.searchParams.get('date_from')
+  const rawDateTo = url.searchParams.get('date_to')
+  const dateFrom = rawDateFrom && YmdDateParamSchema.safeParse(rawDateFrom).success ? rawDateFrom : ''
+  const dateTo = rawDateTo && YmdDateParamSchema.safeParse(rawDateTo).success ? rawDateTo : ''
   const page = parsePositiveInt(url.searchParams.get('page'), 1)
   const perPage = parsePositiveInt(url.searchParams.get('per_page'), 50, 200)
 
