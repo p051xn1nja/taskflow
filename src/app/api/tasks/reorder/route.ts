@@ -1,17 +1,22 @@
 import { NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
+import { z } from 'zod'
+
+const ReorderSchema = z.object({
+  items: z.array(z.object({
+    id: z.string().min(1),
+    board_position: z.number().int().min(0).max(1_000_000),
+  })).min(1).max(500),
+})
 
 export async function POST(req: Request) {
   const { error, session } = await requireAuth()
   if (error) return error
 
-  const body = await req.json()
-  const { items } = body as { items: { id: string; board_position: number }[] }
-
-  if (!Array.isArray(items) || items.length === 0) {
-    return NextResponse.json({ error: 'items array required' }, { status: 400 })
-  }
+  const parsed = ReorderSchema.safeParse(await req.json())
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  const { items } = parsed.data
 
   const db = getDb()
   const userId = session!.user.id
