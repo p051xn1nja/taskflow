@@ -495,7 +495,11 @@ function TasksPageInner() {
             {reminders.overdue > 0 && (
               <button
                 type="button"
-                onClick={() => setFocusView('overdue')}
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                  setFocusView('overdue')
+                }}
                 className="font-semibold underline decoration-dotted hover:text-white"
               >
                 {reminders.overdue} overdue
@@ -505,7 +509,11 @@ function TasksPageInner() {
             {reminders.due_today > 0 && (
               <button
                 type="button"
-                onClick={() => setFocusView('today')}
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                  setFocusView('today')
+                }}
                 className="font-semibold underline decoration-dotted hover:text-white"
               >
                 {reminders.due_today} due today
@@ -515,7 +523,11 @@ function TasksPageInner() {
             {reminders.next_7_days > 0 && (
               <button
                 type="button"
-                onClick={() => setFocusView('upcoming')}
+                onClick={() => {
+                  setDateFrom('')
+                  setDateTo('')
+                  setFocusView('upcoming')
+                }}
                 className="underline decoration-dotted hover:text-white"
               >
                 {reminders.next_7_days} due in next 7 days
