@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import type Database from 'better-sqlite3'
-import { createTestDb, seedUser, seedCategory, seedTask } from '../helpers/test-db'
+import { createTestDb, seedUser, seedCategory, seedTask, seedStatuses } from '../helpers/test-db'
 
 /**
  * Integration tests that exercise task CRUD operations through the database
@@ -294,6 +294,143 @@ describe('Task date update (mirrors PATCH /api/tasks/:id)', () => {
 
     expect(task.start_date).toBe('2026-05-15')
     expect(task.due_date).toBe('2026-05-20')
+  })
+})
+
+describe('Focus view filtering semantics', () => {
+  it('overdue view excludes completed tasks', () => {
+    const { inProgressId, completedId } = seedStatuses(db, userId)
+
+    seedTask(db, userId, {
+      id: 't-overdue-open',
+      title: 'Open overdue',
+      due_date: '2026-01-01',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+    seedTask(db, userId, {
+      id: 't-overdue-done',
+      title: 'Done overdue',
+      due_date: '2026-01-01',
+      status_id: completedId,
+      status: 'completed',
+    })
+
+    const today = '2026-04-10'
+    const rows = db.prepare(`
+      SELECT id FROM tasks t
+      WHERE t.user_id = ?
+        AND t.due_date IS NOT NULL
+        AND date(t.due_date) < date(?)
+        AND (
+          t.status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0)
+          OR (t.status_id IS NULL AND t.status != 'completed')
+        )
+      ORDER BY id
+    `).all(userId, today, userId) as { id: string }[]
+
+    expect(rows.map(r => r.id)).toEqual(['t-overdue-open'])
+  })
+
+  it('no_status view returns only tasks without status_id', () => {
+    const { inProgressId } = seedStatuses(db, userId)
+    seedTask(db, userId, { id: 't-no-status', title: 'Legacy task', status_id: null, status: 'in_progress' })
+    seedTask(db, userId, { id: 't-with-status', title: 'Modern task', status_id: inProgressId, status: 'in_progress' })
+
+    const rows = db.prepare(`
+      SELECT id FROM tasks t
+      WHERE t.user_id = ?
+        AND t.status_id IS NULL
+      ORDER BY id
+    `).all(userId) as { id: string }[]
+
+    expect(rows.map(r => r.id)).toEqual(['t-no-status'])
+  })
+})
+
+describe('Reminder query semantics', () => {
+  it('counts only open tasks when using status_id completion state', () => {
+    const { inProgressId, completedId } = seedStatuses(db, userId)
+
+    seedTask(db, userId, {
+      id: 'r-overdue-open',
+      title: 'Open overdue',
+      due_date: '2026-04-01',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+    seedTask(db, userId, {
+      id: 'r-overdue-done',
+      title: 'Done overdue',
+      due_date: '2026-04-01',
+      status_id: completedId,
+      status: 'completed',
+    })
+    seedTask(db, userId, {
+      id: 'r-upcoming-open',
+      title: 'Open upcoming',
+      due_date: '2026-04-15',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+
+    const openTaskClause = "(status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0) OR (status_id IS NULL AND status != 'completed'))"
+
+    const overdue = db.prepare(`
+      SELECT id FROM tasks
+      WHERE user_id = ?
+        AND ${openTaskClause}
+        AND due_date IS NOT NULL
+        AND date(due_date) < date(?)
+      ORDER BY due_date ASC
+    `).all(userId, userId, '2026-04-10') as { id: string }[]
+
+    const upcoming = db.prepare(`
+      SELECT id FROM tasks
+      WHERE user_id = ?
+        AND ${openTaskClause}
+        AND due_date IS NOT NULL
+        AND date(due_date) > date(?)
+        AND date(due_date) <= date(?, '+7 day')
+      ORDER BY due_date ASC
+    `).all(userId, userId, '2026-04-10', '2026-04-10') as { id: string }[]
+
+    expect(overdue.map(t => t.id)).toEqual(['r-overdue-open'])
+    expect(upcoming.map(t => t.id)).toEqual(['r-upcoming-open'])
+  })
+
+  it('respects reminder row limit for list queries', () => {
+    const { inProgressId } = seedStatuses(db, userId)
+    seedTask(db, userId, {
+      id: 'r-limit-1',
+      title: 'First overdue',
+      due_date: '2026-04-01',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+    seedTask(db, userId, {
+      id: 'r-limit-2',
+      title: 'Second overdue',
+      due_date: '2026-04-02',
+      status_id: inProgressId,
+      status: 'in_progress',
+    })
+
+    const openTaskClause = "(status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0) OR (status_id IS NULL AND status != 'completed'))"
+    const limit = 1
+
+    const overdueLimited = db.prepare(`
+      SELECT id FROM tasks
+      WHERE user_id = ?
+        AND ${openTaskClause}
+        AND due_date IS NOT NULL
+        AND date(due_date) < date(?)
+      ORDER BY due_date ASC
+      LIMIT ?
+    `).all(userId, userId, '2026-04-10', limit) as { id: string }[]
+
+    expect(overdueLimited).toHaveLength(1)
+    expect(overdueLimited[0].id).toBe('r-limit-1')
   })
 })
 

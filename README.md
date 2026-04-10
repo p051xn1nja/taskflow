@@ -48,6 +48,14 @@ docker compose up -d --build
 |---|---|---|
 | `NEXTAUTH_SECRET` | JWT signing secret (required) | — |
 | `NEXTAUTH_URL` | Base URL of the app | `http://localhost:3000` |
+| `REMINDER_WEBHOOK_URL` | Optional webhook for reminder notifications (`/api/tasks/reminders?notify=1`) | — |
+
+### Reminders API Notes
+
+- `GET /api/tasks/reminders` supports:
+  - `limit` (default `5`, max `20`) for row lists
+  - `include_items=0|false` for counts-only responses
+  - `notify=1|true` to trigger optional webhook dispatch (requires `REMINDER_WEBHOOK_URL`)
 
 ## Project Structure
 

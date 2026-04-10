@@ -2,8 +2,19 @@ import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
+import { sanitizeRichHtml } from '@/lib/security'
+import { z } from 'zod'
+
+const UpdateNoteSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  content: z.string().max(200_000).optional(),
+  color: z.string().max(20).optional(),
+  category_id: z.string().optional().nullable(),
+  tags: z.array(z.string()).max(10).optional(),
+  linked_task_ids: z.array(z.string()).max(200).optional(),
+})
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const { error, session } = await requireAuth()
@@ -57,7 +68,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   )
   if (!note) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body = await req.json()
+  const parsed = UpdateNoteSchema.safeParse(await req.json())
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  const body = parsed.data
   const updates: string[] = []
   const values: (string | null)[] = []
 
@@ -67,7 +80,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
   if ('content' in body) {
     updates.push('content = ?')
-    values.push(body.content || '')
+    values.push(sanitizeRichHtml(body.content || ''))
   }
   if ('color' in body) {
     updates.push('color = ?')
@@ -136,7 +149,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   const attachments = db.prepare('SELECT filename FROM note_attachments WHERE note_id = ?').all(params.id) as { filename: string }[]
   for (const att of attachments) {
     const filePath = path.join(UPLOADS_PATH, att.filename)
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    try { await fs.unlink(filePath) } catch {}
   }
 
   db.prepare('DELETE FROM notes WHERE id = ? AND user_id = ?').run(params.id, session!.user.id)

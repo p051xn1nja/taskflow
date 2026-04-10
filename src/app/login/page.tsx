@@ -57,7 +57,7 @@ export default function LoginPage() {
       }
       // Auto-login after setup
       const signInResult = await signIn('credentials', {
-        username: form.username,
+        username: form.username.trim(),
         password: form.password,
         redirect: false,
       })
@@ -74,7 +74,7 @@ export default function LoginPage() {
     }
 
     const result = await signIn('credentials', {
-      username: form.username,
+      username: form.username.trim(),
       password: form.password,
       redirect: false,
     })

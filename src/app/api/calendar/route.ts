@@ -20,6 +20,8 @@ export async function GET(req: Request) {
 
   const db = getDb()
   const userId = session!.user.id
+  const fromTs = `${dateFrom} 00:00:00`
+  const toTs = `${dateTo} 23:59:59`
 
   ensureDefaultStatuses(db, userId)
 
@@ -32,12 +34,12 @@ export async function GET(req: Request) {
     // Tasks with start_date and due_date: shown as a range
     // Tasks with only start_date: shown on start_date
     let taskWhere = `WHERE t.user_id = ? AND (
-      (t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(t.start_date) <= ? AND date(t.due_date) >= ?) OR
-      (t.start_date IS NULL AND t.due_date IS NOT NULL AND date(t.due_date) >= ? AND date(t.due_date) <= ?) OR
-      (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) >= ? AND date(t.start_date) <= ?) OR
-      (t.start_date IS NULL AND t.due_date IS NULL AND date(t.created_at) >= ? AND date(t.created_at) <= ?)
+      (t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND t.start_date <= ? AND t.due_date >= ?) OR
+      (t.start_date IS NULL AND t.due_date IS NOT NULL AND t.due_date >= ? AND t.due_date <= ?) OR
+      (t.start_date IS NOT NULL AND t.due_date IS NULL AND t.start_date >= ? AND t.start_date <= ?) OR
+      (t.start_date IS NULL AND t.due_date IS NULL AND t.created_at >= ? AND t.created_at <= ?)
     )`
-    const taskParams: (string | number)[] = [userId, dateTo, dateFrom, dateFrom, dateTo, dateFrom, dateTo, dateFrom, dateTo]
+    const taskParams: (string | number)[] = [userId, toTs, fromTs, fromTs, toTs, fromTs, toTs, fromTs, toTs]
 
     if (categoryId) {
       taskWhere += ' AND t.category_id = ?'
@@ -57,7 +59,7 @@ export async function GET(req: Request) {
         s.name as status_name, s.color as status_color, s.is_completed,
         c.name as category_name, c.color as category_color
       FROM tasks t
-      LEFT JOIN statuses s ON t.status_id = s.id
+      LEFT JOIN statuses s ON t.status_id = s.id AND s.user_id = t.user_id
       LEFT JOIN categories c ON t.category_id = c.id
       ${taskWhere}
       ORDER BY COALESCE(t.start_date, t.due_date, t.created_at)
@@ -89,8 +91,8 @@ export async function GET(req: Request) {
 
   // Fetch notes by created_at
   if (types === 'all' || types === 'notes') {
-    let noteWhere = 'WHERE n.user_id = ? AND date(n.created_at) >= ? AND date(n.created_at) <= ?'
-    const noteParams: (string | number)[] = [userId, dateFrom, dateTo]
+    let noteWhere = 'WHERE n.user_id = ? AND n.created_at >= ? AND n.created_at <= ?'
+    const noteParams: (string | number)[] = [userId, fromTs, toTs]
 
     if (categoryId) {
       noteWhere += ' AND n.category_id = ?'
