@@ -93,10 +93,12 @@ function initializeSchema(db: Database.Database) {
       status_id TEXT,
       progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
       due_date TEXT,
+      recurrence TEXT NOT NULL DEFAULT 'none' CHECK(recurrence IN ('none', 'daily', 'weekly', 'monthly')),
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+      FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS tags (
@@ -161,21 +163,49 @@ function initializeSchema(db: Database.Database) {
       FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS editor_uploads (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      size INTEGER NOT NULL,
+      note_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (note_id) REFERENCES notes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS task_views (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      filters_json TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status_id ON tasks(status_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_created_at ON tasks(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_status_id ON tasks(user_id, status_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_category_id ON tasks(category_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
     CREATE INDEX IF NOT EXISTS idx_attachments_task_id ON attachments(task_id);
     CREATE INDEX IF NOT EXISTS idx_tags_user_id ON tags(user_id);
     CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
     CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at);
+    CREATE INDEX IF NOT EXISTS idx_notes_user_updated_at ON notes(user_id, updated_at);
     CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
     CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
     CREATE INDEX IF NOT EXISTS idx_note_tasks_note_id ON note_tasks(note_id);
     CREATE INDEX IF NOT EXISTS idx_note_tasks_task_id ON note_tasks(task_id);
     CREATE INDEX IF NOT EXISTS idx_note_attachments_note_id ON note_attachments(note_id);
     CREATE INDEX IF NOT EXISTS idx_statuses_user_id ON statuses(user_id);
+    CREATE INDEX IF NOT EXISTS idx_editor_uploads_user_id ON editor_uploads(user_id);
+    CREATE INDEX IF NOT EXISTS idx_task_views_user_id ON task_views(user_id);
   `)
 
   // Migrations: add columns that may not exist yet
@@ -209,6 +239,9 @@ function initializeSchema(db: Database.Database) {
   if (!taskColumnNames.includes('location')) {
     db.exec("ALTER TABLE tasks ADD COLUMN location TEXT NOT NULL DEFAULT ''")
   }
+  if (!taskColumnNames.includes('recurrence')) {
+    db.exec("ALTER TABLE tasks ADD COLUMN recurrence TEXT NOT NULL DEFAULT 'none'")
+  }
 
   // Migration: add color to notes if missing
   const noteColumns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
@@ -222,6 +255,17 @@ function initializeSchema(db: Database.Database) {
 
   // Migration: task_tags old schema (name column) -> new schema (tag_id column)
   migrateTaskTags(db)
+  migrateTasksStatusForeignKey(db)
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_status_id ON tasks(status_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_created_at ON tasks(user_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_user_status_id ON tasks(user_id, status_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_category_id ON tasks(category_id);
+    CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at);
+    CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
+  `)
 
   // Migration: populate status_id for existing tasks
   migrateTaskStatuses(db)
@@ -355,6 +399,40 @@ function migrateTaskTags(db: Database.Database) {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_task_tags_task_id ON task_tags(task_id);
     CREATE INDEX IF NOT EXISTS idx_task_tags_tag_id ON task_tags(tag_id);
+  `)
+}
+
+function migrateTasksStatusForeignKey(db: Database.Database) {
+  const fkRows = db.prepare('PRAGMA foreign_key_list(tasks)').all() as { from: string; table: string }[]
+  const hasStatusFk = fkRows.some(row => row.from === 'status_id' && row.table === 'statuses')
+  if (hasStatusFk) return
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS tasks_new (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '',
+      category_id TEXT,
+      status TEXT NOT NULL DEFAULT 'in_progress' CHECK(status IN ('in_progress', 'completed')),
+      status_id TEXT,
+      progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
+      due_date TEXT,
+      recurrence TEXT NOT NULL DEFAULT 'none' CHECK(recurrence IN ('none', 'daily', 'weekly', 'monthly')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      start_date TEXT,
+      board_position INTEGER NOT NULL DEFAULT 0,
+      location TEXT NOT NULL DEFAULT '',
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
+      FOREIGN KEY (status_id) REFERENCES statuses(id) ON DELETE SET NULL
+    );
+    INSERT INTO tasks_new (id, user_id, title, description, category_id, status, status_id, progress, due_date, recurrence, created_at, updated_at, start_date, board_position, location)
+    SELECT id, user_id, title, description, category_id, status, status_id, progress, due_date, COALESCE(recurrence, 'none'), created_at, updated_at, start_date, board_position, location
+    FROM tasks;
+    DROP TABLE tasks;
+    ALTER TABLE tasks_new RENAME TO tasks;
   `)
 }
 

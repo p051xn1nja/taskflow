@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import {
   Plus, Search, Filter, ChevronDown, ChevronRight, X,
-  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot,
+  Calendar, Tag, BarChart3, CheckCircle2, Clock, Loader2, CircleDot, Bookmark, Trash2, AlertTriangle,
 } from 'lucide-react'
 import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
@@ -40,6 +40,9 @@ function TasksPageInner() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const [focusView, setFocusView] = useState<'all' | 'inbox' | 'today' | 'upcoming'>('all')
+  const [savedViews, setSavedViews] = useState<{ id: string; name: string; filters_json: string }[]>([])
+  const [reminders, setReminders] = useState<{ overdue: number; due_today: number; next_7_days: number }>({ overdue: 0, due_today: 0, next_7_days: 0 })
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -63,6 +66,17 @@ function TasksPageInner() {
     }
   }, [searchParams])
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowForm(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   // Collapsed groups (years, months, days)
   const [collapsedYears, setCollapsedYears] = useState<Set<string>>(new Set())
   const [collapsedMonths, setCollapsedMonths] = useState<Set<string>>(new Set())
@@ -78,6 +92,7 @@ function TasksPageInner() {
     if (filterCategory) params.set('category_id', filterCategory)
     if (filterStatus) params.set('status_id', filterStatus)
     if (filterTag) params.set('tag', filterTag)
+    if (focusView !== 'all') params.set('view', focusView)
     if (dateFrom) params.set('date_from', dateFrom)
     if (dateTo) params.set('date_to', dateTo)
     params.set('page', String(page))
@@ -87,8 +102,9 @@ function TasksPageInner() {
     const data = await res.json()
     setTasks(data.tasks)
     setPagination(data.pagination)
+    fetchReminders()
     setLoading(false)
-  }, [search, filterCategory, filterStatus, filterTag, dateFrom, dateTo, pagination.per_page])
+  }, [search, filterCategory, filterStatus, filterTag, dateFrom, dateTo, focusView, pagination.per_page])
 
   const fetchCategories = async () => {
     const res = await fetch('/api/categories')
@@ -104,11 +120,23 @@ function TasksPageInner() {
     const res = await fetch('/api/tags')
     setAllTags(await res.json())
   }
+  const fetchSavedViews = async () => {
+    const res = await fetch('/api/task-views')
+    setSavedViews(await res.json())
+  }
+  const fetchReminders = async () => {
+    const res = await fetch('/api/tasks/reminders')
+    if (!res.ok) return
+    const data = await res.json()
+    setReminders(data.counts)
+  }
 
   useEffect(() => {
     fetchCategories()
     fetchStatuses()
     fetchTags()
+    fetchSavedViews()
+    fetchReminders()
   }, [])
 
   useEffect(() => {
@@ -138,7 +166,7 @@ function TasksPageInner() {
     return () => window.removeEventListener('keydown', handler)
   }, [showTagDropdown])
 
-  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string }) => {
+  const handleCreateTask = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; recurrence?: 'none' | 'daily' | 'weekly' | 'monthly' }) => {
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -159,7 +187,7 @@ function TasksPageInner() {
     fetchTasks(pagination.page)
   }
 
-  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; progress?: number }) => {
+  const handleEditSubmit = async (data: { title: string; description: string; category_id: string | null; tags: string[]; start_date: string | null; due_date: string | null; location: string; recurrence?: 'none' | 'daily' | 'weekly' | 'monthly'; progress?: number }) => {
     if (!editingTask) return
     await fetch(`/api/tasks/${editingTask.id}`, {
       method: 'PATCH',
@@ -183,6 +211,52 @@ function TasksPageInner() {
 
   const handleDeleteAttachment = async (attachmentId: string) => {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
+  }
+
+  const handleSaveCurrentView = async () => {
+    const name = window.prompt('Save current view as:')
+    if (!name?.trim()) return
+    await fetch('/api/task-views', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name.trim(),
+        filters: {
+          search,
+          category_id: filterCategory,
+          status_id: filterStatus,
+          tag: filterTag,
+          date_from: dateFrom,
+          date_to: dateTo,
+          view: focusView,
+        },
+      }),
+    })
+    fetchSavedViews()
+  }
+
+  const applySavedView = (filtersJson: string) => {
+    const f = JSON.parse(filtersJson) as {
+      search?: string
+      category_id?: string
+      status_id?: string
+      tag?: string
+      date_from?: string
+      date_to?: string
+      view?: 'all' | 'inbox' | 'today' | 'upcoming'
+    }
+    setSearch(f.search || '')
+    setFilterCategory(f.category_id || '')
+    setFilterStatus(f.status_id || '')
+    setFilterTag(f.tag || '')
+    setDateFrom(f.date_from || '')
+    setDateTo(f.date_to || '')
+    setFocusView(f.view || 'all')
+  }
+
+  const deleteSavedView = async (id: string) => {
+    await fetch(`/api/task-views/${id}`, { method: 'DELETE' })
+    fetchSavedViews()
   }
 
   const toggleYear = (key: string) => {
@@ -269,6 +343,20 @@ function TasksPageInner() {
         </button>
       </div>
 
+      {/* Reminder summary */}
+      {(reminders.overdue > 0 || reminders.due_today > 0 || reminders.next_7_days > 0) && (
+        <div className="card p-3 border border-accent-amber/25 bg-accent-amber/10 flex flex-wrap items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-accent-amber" />
+          <p className="text-sm text-surface-900">
+            {reminders.overdue > 0 && <span className="font-semibold">{reminders.overdue} overdue</span>}
+            {reminders.overdue > 0 && reminders.due_today > 0 && <span> · </span>}
+            {reminders.due_today > 0 && <span className="font-semibold">{reminders.due_today} due today</span>}
+            {(reminders.overdue > 0 || reminders.due_today > 0) && reminders.next_7_days > 0 && <span> · </span>}
+            {reminders.next_7_days > 0 && <span>{reminders.next_7_days} due in next 7 days</span>}
+          </p>
+        </div>
+      )}
+
       {/* Stats cards */}
       <div className="flex gap-3 overflow-x-auto pb-1">
         {/* Total */}
@@ -318,6 +406,58 @@ function TasksPageInner() {
 
       {/* Search & Filters */}
       <div className="card p-4 space-y-3 relative z-10">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'inbox', label: 'Inbox' },
+            { id: 'today', label: 'Today' },
+            { id: 'upcoming', label: 'Upcoming' },
+          ].map(view => (
+            <button
+              key={view.id}
+              type="button"
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs border transition-colors',
+                focusView === view.id
+                  ? 'bg-brand-600/15 text-brand-300 border-brand-500/40'
+                  : 'bg-surface-200/20 text-surface-700 border-surface-300/30 hover:bg-surface-200/35',
+              )}
+              onClick={() => setFocusView(view.id as 'all' | 'inbox' | 'today' | 'upcoming')}
+            >
+              {view.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSaveCurrentView}
+            className="btn-secondary text-xs px-3 py-1.5 flex items-center gap-1.5"
+          >
+            <Bookmark className="w-3.5 h-3.5" />
+            Save view
+          </button>
+          {savedViews.map(v => (
+            <div key={v.id} className="inline-flex items-center rounded-lg border border-surface-300/30 bg-surface-200/20">
+              <button
+                type="button"
+                onClick={() => applySavedView(v.filters_json)}
+                className="px-2.5 py-1.5 text-xs text-surface-800 hover:text-white"
+                title="Apply saved view"
+              >
+                {v.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteSavedView(v.id)}
+                className="px-2 py-1.5 text-surface-700 hover:text-accent-red"
+                title="Delete saved view"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+        </div>
         <div className="flex gap-3">
           <div className="relative flex-1">
             <Search className="w-4 h-4 text-surface-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
