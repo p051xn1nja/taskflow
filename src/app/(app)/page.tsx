@@ -11,7 +11,7 @@ import { TaskCard } from '@/components/TaskCard'
 import { TaskForm } from '@/components/TaskForm'
 import { Pagination } from '@/components/Pagination'
 import { ConfirmModal } from '@/components/ConfirmModal'
-import { cn, groupBy } from '@/lib/utils'
+import { cn, groupBy, parseQuickTaskInput } from '@/lib/utils'
 import type { Task, Category, Status, Tag as TagType } from '@/types'
 
 export default function TasksPage() {
@@ -228,33 +228,8 @@ function TasksPageInner() {
     await fetch(`/api/uploads/${attachmentId}`, { method: 'DELETE' })
   }
 
-  const parseQuickInput = (raw: string, fallbackDueDate: string) => {
-    let title = raw.trim()
-    let due: string | null = fallbackDueDate || null
-    const now = new Date()
-    const toYmd = (d: Date) => d.toISOString().slice(0, 10)
-
-    if (/\btoday\b/i.test(title)) {
-      due = toYmd(now)
-      title = title.replace(/\btoday\b/ig, '').trim()
-    } else if (/\btomorrow\b/i.test(title)) {
-      const d = new Date(now)
-      d.setDate(d.getDate() + 1)
-      due = toYmd(d)
-      title = title.replace(/\btomorrow\b/ig, '').trim()
-    } else if (/\bnext week\b/i.test(title)) {
-      const d = new Date(now)
-      d.setDate(d.getDate() + 7)
-      due = toYmd(d)
-      title = title.replace(/\bnext week\b/ig, '').trim()
-    }
-
-    title = title.replace(/\s{2,}/g, ' ').trim()
-    return { title, due_date: due }
-  }
-
   const handleQuickAdd = async () => {
-    const parsed = parseQuickInput(quickTitle, quickDueDate)
+    const parsed = parseQuickTaskInput(quickTitle, quickDueDate)
     const title = parsed.title
     if (!title) return
     await fetch('/api/tasks', {

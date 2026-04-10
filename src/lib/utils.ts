@@ -43,3 +43,27 @@ export function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<strin
     return groups
   }, {} as Record<string, T[]>)
 }
+
+export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new Date()): { title: string; due_date: string | null } {
+  let title = raw.trim()
+  let due: string | null = fallbackDueDate || null
+  const toYmd = (d: Date) => d.toISOString().slice(0, 10)
+
+  if (/\btoday\b/i.test(title)) {
+    due = toYmd(now)
+    title = title.replace(/\btoday\b/ig, '').trim()
+  } else if (/\btomorrow\b/i.test(title)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 1)
+    due = toYmd(d)
+    title = title.replace(/\btomorrow\b/ig, '').trim()
+  } else if (/\bnext week\b/i.test(title)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 7)
+    due = toYmd(d)
+    title = title.replace(/\bnext week\b/ig, '').trim()
+  }
+
+  title = title.replace(/\s{2,}/g, ' ').trim()
+  return { title, due_date: due }
+}
