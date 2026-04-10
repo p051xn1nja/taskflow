@@ -22,6 +22,7 @@ const TaskViewParamSchema = z.enum(['inbox', 'today', 'upcoming', 'overdue', 'no
 const YmdDateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const SearchParamSchema = z.string().trim().max(120)
 const TagParamSchema = z.string().trim().max(60)
+const IdParamSchema = z.string().trim().min(1).max(48)
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
@@ -30,9 +31,11 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const rawSearch = url.searchParams.get('search')
   const search = rawSearch && SearchParamSchema.safeParse(rawSearch).success ? rawSearch.trim() : ''
-  const categoryId = url.searchParams.get('category_id') || ''
+  const rawCategoryId = url.searchParams.get('category_id')
+  const categoryId = rawCategoryId && IdParamSchema.safeParse(rawCategoryId).success ? rawCategoryId.trim() : ''
   const status = url.searchParams.get('status') || ''
-  const statusId = url.searchParams.get('status_id') || ''
+  const rawStatusId = url.searchParams.get('status_id')
+  const statusId = rawStatusId && IdParamSchema.safeParse(rawStatusId).success ? rawStatusId.trim() : ''
   const rawTag = url.searchParams.get('tag')
   const tag = rawTag && TagParamSchema.safeParse(rawTag).success ? rawTag.trim() : ''
   const rawView = url.searchParams.get('view')
