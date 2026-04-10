@@ -32,6 +32,8 @@ Modern task management platform built with Next.js, React, TypeScript, and SQLit
 ```bash
 npm install
 npm run dev
+# optional full local validation:
+npm run verify
 ```
 
 Open http://localhost:3000 - the first user you create becomes the admin.
