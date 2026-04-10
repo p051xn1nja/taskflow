@@ -23,6 +23,7 @@ const YmdDateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const SearchParamSchema = z.string().trim().max(120)
 const TagParamSchema = z.string().trim().max(60)
 const IdParamSchema = z.string().trim().min(1).max(48)
+const LegacyStatusParamSchema = z.enum(['in_progress', 'completed'])
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
@@ -33,7 +34,8 @@ export async function GET(req: Request) {
   const search = rawSearch && SearchParamSchema.safeParse(rawSearch).success ? rawSearch.trim() : ''
   const rawCategoryId = url.searchParams.get('category_id')
   const categoryId = rawCategoryId && IdParamSchema.safeParse(rawCategoryId).success ? rawCategoryId.trim() : ''
-  const status = url.searchParams.get('status') || ''
+  const rawStatus = url.searchParams.get('status')
+  const status = rawStatus && LegacyStatusParamSchema.safeParse(rawStatus).success ? rawStatus : ''
   const rawStatusId = url.searchParams.get('status_id')
   const statusId = rawStatusId && IdParamSchema.safeParse(rawStatusId).success ? rawStatusId.trim() : ''
   const rawTag = url.searchParams.get('tag')
