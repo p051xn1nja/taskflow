@@ -6,6 +6,14 @@ describe('resolveReminderNotificationStatus', () => {
     expect(resolveReminderNotificationStatus({ responseOk: false })).toBe('failed')
   })
 
+  it('prioritizes failed status over other meta when response is not ok', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: false,
+      notificationAvailable: false,
+      notificationDispatched: true,
+    })).toBe('failed')
+  })
+
   it('returns unavailable when webhook is unavailable', () => {
     expect(resolveReminderNotificationStatus({
       responseOk: true,
@@ -32,5 +40,13 @@ describe('resolveReminderNotificationStatus', () => {
       responseOk: true,
       notificationAvailable: true,
     })).toBe('sent')
+  })
+
+  it('treats unavailable as higher priority than dispatched=true', () => {
+    expect(resolveReminderNotificationStatus({
+      responseOk: true,
+      notificationAvailable: false,
+      notificationDispatched: true,
+    })).toBe('unavailable')
   })
 })
