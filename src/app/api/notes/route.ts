@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import { getDb } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
+import { sanitizeRichHtml } from '@/lib/security'
+import { z } from 'zod'
+
+const CreateNoteSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  content: z.string().max(200_000).optional(),
+  tags: z.array(z.string()).max(10).optional(),
+  linked_task_ids: z.array(z.string()).max(200).optional(),
+  category_id: z.string().optional().nullable(),
+})
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
@@ -79,15 +89,11 @@ export async function POST(req: Request) {
   const { error, session } = await requireAuth()
   if (error) return error
 
-  const body = await req.json()
-  const { title, content, tags, linked_task_ids, category_id } = body
-
-  if (!title || title.trim().length === 0) {
-    return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+  const parsed = CreateNoteSchema.safeParse(await req.json())
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
   }
-  if (title.length > 200) {
-    return NextResponse.json({ error: 'Title too long' }, { status: 400 })
-  }
+  const { title, content, tags, linked_task_ids, category_id } = parsed.data
 
   const db = getDb()
   const id = generateId()
@@ -95,7 +101,7 @@ export async function POST(req: Request) {
 
   db.prepare(
     'INSERT INTO notes (id, user_id, title, content, category_id) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, userId, title.trim(), (content || '').trim(), category_id || null)
+  ).run(id, userId, title.trim(), sanitizeRichHtml((content || '').trim()), category_id || null)
 
   // Insert tags
   if (tags && Array.isArray(tags)) {

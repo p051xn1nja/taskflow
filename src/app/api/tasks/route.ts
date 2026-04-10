@@ -4,6 +4,19 @@ import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
 import { getPlatformSettings } from '@/lib/platform-settings'
 import type { Task } from '@/types'
+import { z } from 'zod'
+
+const CreateTaskSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().max(20_000).optional(),
+  category_id: z.string().optional().nullable(),
+  tags: z.array(z.string()).max(10).optional(),
+  start_date: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  status_id: z.string().optional().nullable(),
+  location: z.string().max(200).optional(),
+  recurrence: z.enum(['none', 'daily', 'weekly', 'monthly']).optional(),
+})
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
@@ -15,6 +28,7 @@ export async function GET(req: Request) {
   const status = url.searchParams.get('status') || ''
   const statusId = url.searchParams.get('status_id') || ''
   const tag = url.searchParams.get('tag') || ''
+  const view = url.searchParams.get('view') || ''
   const dateFrom = url.searchParams.get('date_from') || ''
   const dateTo = url.searchParams.get('date_to') || ''
   const page = Math.max(1, parseInt(url.searchParams.get('page') || '1'))
@@ -61,6 +75,18 @@ export async function GET(req: Request) {
     where += ' AND t.id IN (SELECT tt.task_id FROM task_tags tt JOIN tags tg ON tt.tag_id = tg.id WHERE tg.name = ?)'
     params.push(tag)
   }
+  if (view) {
+    const today = new Date().toISOString().slice(0, 10)
+    if (view === 'inbox') {
+      where += ' AND t.start_date IS NULL AND t.due_date IS NULL'
+    } else if (view === 'today') {
+      where += " AND ((t.start_date IS NOT NULL AND t.due_date IS NOT NULL AND date(?) BETWEEN date(t.start_date) AND date(t.due_date)) OR (t.due_date IS NOT NULL AND date(t.due_date) = date(?)) OR (t.start_date IS NOT NULL AND t.due_date IS NULL AND date(t.start_date) = date(?)))"
+      params.push(today, today, today)
+    } else if (view === 'upcoming') {
+      where += ' AND ((t.due_date IS NOT NULL AND date(t.due_date) > date(?)) OR (t.start_date IS NOT NULL AND date(t.start_date) > date(?)))'
+      params.push(today, today)
+    }
+  }
 
   const countRow = db.prepare(`SELECT COUNT(*) as total FROM tasks t ${where}`).get(...params) as { total: number }
   const total = countRow.total
@@ -72,7 +98,7 @@ export async function GET(req: Request) {
       s.name as status_name, s.color as status_color, s.is_completed as status_is_completed, s.is_default as status_is_default, s.position as status_position
     FROM tasks t
     LEFT JOIN categories c ON t.category_id = c.id
-    LEFT JOIN statuses s ON t.status_id = s.id
+    LEFT JOIN statuses s ON t.status_id = s.id AND s.user_id = t.user_id
     ${where}
     ORDER BY t.created_at DESC
     LIMIT ? OFFSET ?
@@ -137,16 +163,9 @@ export async function POST(req: Request) {
   const { error, session } = await requireAuth()
   if (error) return error
 
-  const body = await req.json()
-  const { title, description, category_id, tags, start_date, due_date, status_id, location } = body
-
-  if (!title || title.trim().length === 0) {
-    return NextResponse.json({ error: 'Title is required' }, { status: 400 })
-  }
-
-  if (title.length > 120) {
-    return NextResponse.json({ error: 'Title too long' }, { status: 400 })
-  }
+  const parsed = CreateTaskSchema.safeParse(await req.json())
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  const { title, description, category_id, tags, start_date, due_date, status_id, location, recurrence } = parsed.data
 
   const db = getDb()
   const id = generateId()
@@ -167,13 +186,16 @@ export async function POST(req: Request) {
       'SELECT id FROM statuses WHERE user_id = ? AND is_default = 1'
     ).get(userId) as { id: string } | undefined
     resolvedStatusId = defaultStatus?.id || null
+  } else {
+    const statusRow = db.prepare('SELECT id FROM statuses WHERE id = ? AND user_id = ?').get(resolvedStatusId, userId)
+    if (!statusRow) return NextResponse.json({ error: 'Invalid status_id' }, { status: 400 })
   }
 
   const createTaskTx = db.transaction(() => {
     db.prepare(`
-      INSERT INTO tasks (id, user_id, title, description, category_id, start_date, due_date, status_id, location)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, start_date || null, due_date || null, resolvedStatusId, (location || '').trim())
+      INSERT INTO tasks (id, user_id, title, description, category_id, start_date, due_date, status_id, location, recurrence)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, userId, title.trim(), (description || '').trim(), category_id || null, start_date || null, due_date || null, resolvedStatusId, (location || '').trim(), recurrence || 'none')
 
     if (tags && Array.isArray(tags)) {
       const findTag = db.prepare('SELECT id FROM tags WHERE user_id = ? AND name = ? COLLATE NOCASE')

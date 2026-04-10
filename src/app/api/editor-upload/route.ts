@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
 
-const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'])
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
 
 export async function POST(req: Request) {
   const { error, session } = await requireAuth()
@@ -30,11 +30,14 @@ export async function POST(req: Request) {
   const filename = `${id}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  fs.writeFileSync(path.join(UPLOADS_PATH, filename), buffer)
+  await fs.writeFile(path.join(UPLOADS_PATH, filename), buffer)
+  const db = getDb()
+  db.prepare(
+    'INSERT INTO editor_uploads (id, user_id, filename, mime_type, size, note_id) VALUES (?, ?, ?, ?, ?, ?)'
+  ).run(id, session!.user.id, filename, file.type || 'application/octet-stream', file.size, noteId || null)
 
   // If note_id provided, track as note attachment
   if (noteId) {
-    const db = getDb()
     const note = db.prepare('SELECT id FROM notes WHERE id = ? AND user_id = ?').get(noteId, session!.user.id)
     if (note) {
       db.prepare(
