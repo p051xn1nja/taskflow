@@ -51,6 +51,7 @@ function TasksPageInner() {
   const [templateName, setTemplateName] = useState('')
   const [templateTitle, setTemplateTitle] = useState('')
   const [templateRecurrence, setTemplateRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none')
+  const [sendingReminderNotification, setSendingReminderNotification] = useState(false)
 
   // Tag filter search
   const [tagFilterSearch, setTagFilterSearch] = useState('')
@@ -145,6 +146,15 @@ function TasksPageInner() {
     const res = await fetch('/api/task-templates')
     if (!res.ok) return
     setTemplates(await res.json())
+  }
+
+  const triggerReminderNotification = async () => {
+    setSendingReminderNotification(true)
+    try {
+      await fetch('/api/tasks/reminders?include_items=0&notify=1', { cache: 'no-store' })
+    } finally {
+      setSendingReminderNotification(false)
+    }
   }
 
   useEffect(() => {
@@ -534,6 +544,14 @@ function TasksPageInner() {
               </button>
             )}
           </p>
+          <button
+            type="button"
+            onClick={triggerReminderNotification}
+            disabled={sendingReminderNotification}
+            className="ml-auto text-xs px-2 py-1 rounded border border-surface-400/40 text-surface-800 hover:bg-surface-200/20 disabled:opacity-60"
+          >
+            {sendingReminderNotification ? 'Sending…' : 'Notify now'}
+          </button>
         </div>
       )}
 
