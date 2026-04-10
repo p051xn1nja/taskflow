@@ -4,6 +4,18 @@ import { requireAuth } from '@/lib/api-helpers'
 import { generateId } from '@/lib/utils'
 import { getPlatformSettings } from '@/lib/platform-settings'
 import type { Task } from '@/types'
+import { z } from 'zod'
+
+const CreateTaskSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  description: z.string().max(20_000).optional(),
+  category_id: z.string().optional().nullable(),
+  tags: z.array(z.string()).max(10).optional(),
+  start_date: z.string().optional().nullable(),
+  due_date: z.string().optional().nullable(),
+  status_id: z.string().optional().nullable(),
+  location: z.string().max(200).optional(),
+})
 
 export async function GET(req: Request) {
   const { error, session } = await requireAuth()
@@ -72,7 +84,7 @@ export async function GET(req: Request) {
       s.name as status_name, s.color as status_color, s.is_completed as status_is_completed, s.is_default as status_is_default, s.position as status_position
     FROM tasks t
     LEFT JOIN categories c ON t.category_id = c.id
-    LEFT JOIN statuses s ON t.status_id = s.id
+    LEFT JOIN statuses s ON t.status_id = s.id AND s.user_id = t.user_id
     ${where}
     ORDER BY t.created_at DESC
     LIMIT ? OFFSET ?
@@ -137,16 +149,9 @@ export async function POST(req: Request) {
   const { error, session } = await requireAuth()
   if (error) return error
 
-  const body = await req.json()
-  const { title, description, category_id, tags, start_date, due_date, status_id, location } = body
-
-  if (!title || title.trim().length === 0) {
-    return NextResponse.json({ error: 'Title is required' }, { status: 400 })
-  }
-
-  if (title.length > 120) {
-    return NextResponse.json({ error: 'Title too long' }, { status: 400 })
-  }
+  const parsed = CreateTaskSchema.safeParse(await req.json())
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  const { title, description, category_id, tags, start_date, due_date, status_id, location } = parsed.data
 
   const db = getDb()
   const id = generateId()
@@ -167,6 +172,9 @@ export async function POST(req: Request) {
       'SELECT id FROM statuses WHERE user_id = ? AND is_default = 1'
     ).get(userId) as { id: string } | undefined
     resolvedStatusId = defaultStatus?.id || null
+  } else {
+    const statusRow = db.prepare('SELECT id FROM statuses WHERE id = ? AND user_id = ?').get(resolvedStatusId, userId)
+    if (!statusRow) return NextResponse.json({ error: 'Invalid status_id' }, { status: 400 })
   }
 
   const createTaskTx = db.transaction(() => {
