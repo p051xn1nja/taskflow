@@ -43,3 +43,91 @@ export function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<strin
     return groups
   }, {} as Record<string, T[]>)
 }
+
+export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new Date()): { title: string; due_date: string | null } {
+  let title = raw.trim()
+  let due: string | null = fallbackDueDate || null
+  const toYmd = (d: Date) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+  const weekdayAliases: Record<string, typeof weekdays[number]> = {
+    sun: 'sunday',
+    sunday: 'sunday',
+    mon: 'monday',
+    monday: 'monday',
+    tue: 'tuesday',
+    tues: 'tuesday',
+    tuesday: 'tuesday',
+    wed: 'wednesday',
+    weds: 'wednesday',
+    wednesday: 'wednesday',
+    thu: 'thursday',
+    thur: 'thursday',
+    thurs: 'thursday',
+    thursday: 'thursday',
+    fri: 'friday',
+    friday: 'friday',
+    sat: 'saturday',
+    saturday: 'saturday',
+  }
+
+  const nextWeekday = (from: Date, targetDay: number) => {
+    const d = new Date(from)
+    const delta = (targetDay - d.getDay() + 7) % 7 || 7
+    d.setDate(d.getDate() + delta)
+    return d
+  }
+
+  const addMonthClamped = (from: Date) => {
+    const d = new Date(from)
+    const originalDay = d.getDate()
+    d.setDate(1)
+    d.setMonth(d.getMonth() + 1)
+    const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+    d.setDate(Math.min(originalDay, lastDay))
+    return d
+  }
+
+  if (/\btoday\b/i.test(title)) {
+    due = toYmd(now)
+    title = title.replace(/\btoday\b/ig, '').trim()
+  } else if (/\btomorrow\b/i.test(title)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 1)
+    due = toYmd(d)
+    title = title.replace(/\btomorrow\b/ig, '').trim()
+  } else if (/\bnext week\b/i.test(title)) {
+    const d = new Date(now)
+    d.setDate(d.getDate() + 7)
+    due = toYmd(d)
+    title = title.replace(/\bnext week\b/ig, '').trim()
+  } else if (/\bnext month\b/i.test(title)) {
+    const d = addMonthClamped(now)
+    due = toYmd(d)
+    title = title.replace(/\bnext month\b/ig, '').trim()
+  } else {
+    const weekdayPattern = /\bnext (sun(?:day)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday|s)?|thu(?:rsday|r|rs)?|fri(?:day)?|sat(?:urday)?)\b/i
+    const match = title.match(weekdayPattern)
+    if (match) {
+      const weekday = weekdayAliases[match[1].toLowerCase()]
+      if (weekday) {
+        due = toYmd(nextWeekday(now, weekdays.indexOf(weekday)))
+      }
+      title = title.replace(weekdayPattern, '').trim()
+    }
+  }
+
+  title = title.replace(/\s{2,}/g, ' ').trim()
+  return { title, due_date: due }
+}
+
+export function parsePositiveInt(value: string | null | undefined, fallback: number, max?: number): number {
+  const parsed = Number.parseInt(value ?? '', 10)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  if (typeof max === 'number') return Math.min(parsed, max)
+  return parsed
+}

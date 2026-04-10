@@ -32,6 +32,8 @@ Modern task management platform built with Next.js, React, TypeScript, and SQLit
 ```bash
 npm install
 npm run dev
+# optional full local validation:
+npm run verify
 ```
 
 Open http://localhost:3000 - the first user you create becomes the admin.
@@ -48,6 +50,19 @@ docker compose up -d --build
 |---|---|---|
 | `NEXTAUTH_SECRET` | JWT signing secret (required) | — |
 | `NEXTAUTH_URL` | Base URL of the app | `http://localhost:3000` |
+| `REMINDER_WEBHOOK_URL` | Optional webhook for reminder notifications (`/api/tasks/reminders?notify=1`) | — |
+
+### Reminders API Notes
+
+- `GET /api/tasks/reminders` supports:
+  - `limit` (default `5`, max `20`) for row lists
+  - `include_items=0|false` for counts-only responses
+  - `notify=1|true` to trigger optional webhook dispatch (requires `REMINDER_WEBHOOK_URL`)
+- response `meta` includes:
+  - `notification_attempted` (`true` when `notify=1|true` is requested)
+  - `notification_dispatched` (`true` only when webhook POST succeeds)
+  - `notification_available` (`true` when `REMINDER_WEBHOOK_URL` is configured)
+  - `notification_reason` (`not_requested`, `dispatched`, `no_webhook_configured`, `no_pending_reminders`, `webhook_failed`)
 
 ## Project Structure
 

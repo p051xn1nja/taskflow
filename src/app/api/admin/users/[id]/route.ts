@@ -2,8 +2,18 @@ import { NextResponse } from 'next/server'
 import { getDb, UPLOADS_PATH } from '@/lib/db'
 import { requireAdmin } from '@/lib/api-helpers'
 import { hash } from 'bcryptjs'
-import fs from 'fs'
+import { promises as fs } from 'fs'
 import path from 'path'
+import { z } from 'zod'
+
+const UpdateUserSchema = z.object({
+  display_name: z.string().trim().min(1).max(60).optional(),
+  email: z.string().trim().toLowerCase().email().optional(),
+  role: z.enum(['admin', 'user']).optional(),
+  is_active: z.boolean().optional(),
+  pending_approval: z.boolean().optional(),
+  password: z.string().min(8).max(128).optional(),
+})
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const { error, session } = await requireAdmin()
@@ -13,7 +23,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(params.id) as { id: string; role: string } | undefined
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const body = await req.json()
+  const parsed = UpdateUserSchema.safeParse(await req.json())
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  const body = parsed.data
   const updates: string[] = []
   const values: (string | number)[] = []
 
@@ -71,7 +83,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   const user = db.prepare('SELECT profile_photo FROM users WHERE id = ?').get(params.id) as { profile_photo: string } | undefined
   if (user?.profile_photo) {
     const photoPath = path.join(UPLOADS_PATH, user.profile_photo)
-    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath)
+    try { await fs.unlink(photoPath) } catch {}
   }
 
   // Delete task attachment files
@@ -80,7 +92,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   ).all(params.id) as { filename: string }[]
   for (const att of attachments) {
     const attPath = path.join(UPLOADS_PATH, att.filename)
-    if (fs.existsSync(attPath)) fs.unlinkSync(attPath)
+    try { await fs.unlink(attPath) } catch {}
   }
 
   // Delete note attachment files
@@ -89,7 +101,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   ).all(params.id) as { filename: string }[]
   for (const att of noteAttachments) {
     const attPath = path.join(UPLOADS_PATH, att.filename)
-    if (fs.existsSync(attPath)) fs.unlinkSync(attPath)
+    try { await fs.unlink(attPath) } catch {}
   }
 
   db.prepare('DELETE FROM users WHERE id = ?').run(params.id)
