@@ -47,7 +47,12 @@ export function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<strin
 export function parseQuickTaskInput(raw: string, fallbackDueDate = '', now = new Date()): { title: string; due_date: string | null } {
   let title = raw.trim()
   let due: string | null = fallbackDueDate || null
-  const toYmd = (d: Date) => d.toISOString().slice(0, 10)
+  const toYmd = (d: Date) => {
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
   const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 
   const nextWeekday = (from: Date, targetDay: number) => {

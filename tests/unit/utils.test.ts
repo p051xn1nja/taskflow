@@ -115,6 +115,14 @@ describe('parseQuickTaskInput', () => {
     })
   })
 
+  it('formats local date parts with leading zeros', () => {
+    const localDate = new Date(2026, 0, 5, 9, 30, 0)
+    expect(parseQuickTaskInput('Review today', '', localDate)).toEqual({
+      title: 'Review',
+      due_date: '2026-01-05',
+    })
+  })
+
   it('parses "tomorrow" keyword', () => {
     expect(parseQuickTaskInput('Call mom tomorrow', '', now)).toEqual({
       title: 'Call mom',
