@@ -15,6 +15,11 @@ export async function GET(req: Request) {
   const shouldNotify = notifyParam === '1' || notifyParam?.toLowerCase() === 'true'
   const db = getDb()
   const userId = session!.user.id
+  const dateBounds = db.prepare(
+    "SELECT date('now', 'localtime') as today, date('now', 'localtime', '+7 day') as next7"
+  ).get() as { today: string; next7: string }
+  const today = dateBounds.today
+  const next7Date = dateBounds.next7
   const openTaskClause = "(status_id IN (SELECT id FROM statuses WHERE user_id = ? AND is_completed = 0) OR (status_id IS NULL AND status != 'completed'))"
 
   const overdueCountRow = db.prepare(
@@ -23,8 +28,8 @@ export async function GET(req: Request) {
      WHERE user_id = ?
        AND ${openTaskClause}
        AND due_date IS NOT NULL
-       AND date(due_date) < date('now', 'localtime')`
-  ).get(userId, userId) as { total: number }
+       AND due_date < ?`
+  ).get(userId, userId, today) as { total: number }
 
   const dueTodayCountRow = db.prepare(
     `SELECT COUNT(*) as total
@@ -32,8 +37,8 @@ export async function GET(req: Request) {
      WHERE user_id = ?
        AND ${openTaskClause}
        AND due_date IS NOT NULL
-       AND date(due_date) = date('now', 'localtime')`
-  ).get(userId, userId) as { total: number }
+       AND due_date = ?`
+  ).get(userId, userId, today) as { total: number }
 
   const upcomingCountRow = db.prepare(
     `SELECT COUNT(*) as total
@@ -41,9 +46,9 @@ export async function GET(req: Request) {
      WHERE user_id = ?
        AND ${openTaskClause}
        AND due_date IS NOT NULL
-       AND date(due_date) > date('now', 'localtime')
-       AND date(due_date) <= date('now', 'localtime', '+7 day')`
-  ).get(userId, userId) as { total: number }
+       AND due_date > ?
+       AND due_date <= ?`
+  ).get(userId, userId, today, next7Date) as { total: number }
 
   const overdue = includeItems ? db.prepare(
     `SELECT id, title, due_date
@@ -51,10 +56,10 @@ export async function GET(req: Request) {
      WHERE user_id = ?
        AND ${openTaskClause}
        AND due_date IS NOT NULL
-       AND date(due_date) < date('now', 'localtime')
+       AND due_date < ?
      ORDER BY due_date ASC
      LIMIT ?`
-  ).all(userId, userId, limit) : []
+  ).all(userId, userId, today, limit) : []
 
   const dueToday = includeItems ? db.prepare(
     `SELECT id, title, due_date
@@ -62,10 +67,10 @@ export async function GET(req: Request) {
      WHERE user_id = ?
        AND ${openTaskClause}
        AND due_date IS NOT NULL
-       AND date(due_date) = date('now', 'localtime')
+       AND due_date = ?
      ORDER BY due_date ASC
      LIMIT ?`
-  ).all(userId, userId, limit) : []
+  ).all(userId, userId, today, limit) : []
 
   const upcoming = includeItems ? db.prepare(
     `SELECT id, title, due_date
@@ -73,11 +78,11 @@ export async function GET(req: Request) {
      WHERE user_id = ?
        AND ${openTaskClause}
        AND due_date IS NOT NULL
-       AND date(due_date) > date('now', 'localtime')
-       AND date(due_date) <= date('now', 'localtime', '+7 day')
+       AND due_date > ?
+       AND due_date <= ?
      ORDER BY due_date ASC
      LIMIT ?`
-  ).all(userId, userId, limit) : []
+  ).all(userId, userId, today, next7Date, limit) : []
 
   let notificationDispatched = false
   let notificationReason: 'not_requested' | 'dispatched' | 'no_webhook_configured' | 'no_pending_reminders' | 'webhook_failed' = 'not_requested'
