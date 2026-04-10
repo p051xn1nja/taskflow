@@ -1,5 +1,22 @@
 export type ReminderNotificationStatus = 'idle' | 'sent' | 'failed' | 'unavailable'
 
+export type ReminderMeta = {
+  notification_attempted?: boolean
+  notification_dispatched?: boolean
+  notification_available?: boolean
+}
+
+export type ReminderCounts = {
+  overdue: number
+  due_today: number
+  next_7_days: number
+}
+
+export type ReminderResponse = {
+  counts: ReminderCounts
+  meta?: ReminderMeta
+}
+
 export function resolveReminderNotificationStatus(input: {
   responseOk: boolean
   notificationAvailable?: boolean

@@ -12,7 +12,7 @@ import { TaskForm } from '@/components/TaskForm'
 import { Pagination } from '@/components/Pagination'
 import { ConfirmModal } from '@/components/ConfirmModal'
 import { cn, groupBy, parseQuickTaskInput } from '@/lib/utils'
-import { resolveReminderNotificationStatus, type ReminderNotificationStatus } from '@/lib/reminders'
+import { resolveReminderNotificationStatus, type ReminderNotificationStatus, type ReminderResponse } from '@/lib/reminders'
 import type { Task, Category, Status, Tag as TagType } from '@/types'
 
 export default function TasksPage() {
@@ -142,7 +142,7 @@ function TasksPageInner() {
   const fetchReminders = async () => {
     const res = await fetch('/api/tasks/reminders?include_items=0')
     if (!res.ok) return
-    const data = await res.json() as { counts: { overdue: number; due_today: number; next_7_days: number }; meta?: { notification_available?: boolean } }
+    const data = await res.json() as ReminderResponse
     if (typeof data.meta?.notification_available === 'boolean') {
       setReminderWebhookAvailable(data.meta.notification_available)
     }
@@ -167,7 +167,7 @@ function TasksPageInner() {
         setReminderNotificationStatus(resolveReminderNotificationStatus({ responseOk: false }))
         return
       }
-      const data = await res.json() as { meta?: { notification_dispatched?: boolean; notification_available?: boolean } }
+      const data = await res.json() as ReminderResponse
       const status = resolveReminderNotificationStatus({
         responseOk: true,
         notificationAvailable: data.meta?.notification_available,
