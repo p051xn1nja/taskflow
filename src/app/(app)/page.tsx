@@ -158,6 +158,11 @@ function TasksPageInner() {
         setReminderNotificationStatus('failed')
         return
       }
+      const data = await res.json() as { meta?: { notification_dispatched?: boolean } }
+      if (data.meta?.notification_dispatched === false) {
+        setReminderNotificationStatus('failed')
+        return
+      }
       setReminderNotificationStatus('sent')
       fetchReminders()
     } catch {
